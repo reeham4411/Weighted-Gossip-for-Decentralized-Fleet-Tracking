@@ -66,7 +66,16 @@ REGION_SIZE           = 100.0
 
 # For full original-style run, set MAX_ROUNDS=100 and TRIALS=5.
 # For fasterdemonstration including N=1000, these defaults are practical.
-MAX_ROUNDS            = 50
+#
+# NOTE (real-data finding): with real NYC speed data (5-70 mph range, much
+# wider variance than the original synthetic 15-45 km/h range), Uniform and
+# Fixed GWG were observed to NOT reach 90% convergence within 50 rounds —
+# they hit the MAX_ROUNDS cap on every trial. This isn't a bug; it's real-world
+# heterogeneity taking longer to average out than the idealized synthetic
+# case. MAX_ROUNDS is raised to give protocols a fair chance to actually
+# converge and be compared meaningfully. Raise TRIALS too if your machine
+# can afford the extra runtime (more trials = tighter error bars).
+MAX_ROUNDS            = 150
 TRIALS                = 3
 NODE_COUNTS           = [100, 500, 1000]
 
@@ -75,6 +84,16 @@ CONVERGENCE_PCT       = 0.90
 MSG_SIZE_BYTES        = 42
 NEIGHBOR_CACHE_K      = 30
 OUT_DIR               = "."
+
+# AV / self-driving-car real-time relevance -----------------------------
+# Autonomous vehicle platooning and cooperative-collision-avoidance systems
+# depend on frequent, low-latency speed updates from nearby vehicles (V2V).
+# DSRC/C-V2X beacon intervals are typically ~100ms. We treat each gossip
+# round as one such beacon interval and ask: within a realistic real-time
+# decision budget, how accurate is each protocol's speed estimate?
+AV_ROUND_LATENCY_MS   = 100
+AV_LATENCY_BUDGETS_MS = [500, 1000, 2000, 5000]   # 0.5s / 1s / 2s / 5s windows
+AV_USABLE_MAPE_PCT    = 10.0   # error threshold considered "usable" for AV decisions
 
 #adaptive-zone settings
 ADAPTIVE_MIN_REGION_NODES = 3
@@ -131,6 +150,9 @@ def create_fleet(n_nodes):
     total_area = GRID_SIZE * REGION_SIZE
     nodes = []
 
+    # Max possible center_distance, for normalizing to a 0..1 congestion factor.
+    max_center_distance = math.sqrt(2) * (GRID_SIZE / 2)
+
     for i in range(n_nodes):
         x = random.uniform(0, total_area)
         y = random.uniform(0, total_area)
@@ -139,7 +161,20 @@ def create_fleet(n_nodes):
         ry = int(y // REGION_SIZE)
 
         center_distance = math.sqrt((rx - GRID_SIZE / 2) ** 2 + (ry - GRID_SIZE / 2) ** 2)
-        speed = float(random.choice(NYC_SPEEDS))
+
+        # BUG FIX: center_distance was computed but never used, meaning speed
+        # had zero correlation with position/region — undermining the whole
+        # premise of regional gossip aggregation. Real cities show exactly
+        # this pattern: congested/slow near the center, faster on outer
+        # highway-like corridors. We model that here: a mild speed factor
+        # from 0.7x (center, congested) to 1.3x (edge, freer-flowing),
+        # applied on top of the real NYC speed sample so the underlying
+        # real-world distribution is preserved, just spatially correlated.
+        normalized_dist = min(center_distance / max_center_distance, 1.0)
+        congestion_factor = 0.7 + 0.6 * normalized_dist
+
+        base_speed = random.choice(NYC_SPEEDS)
+        speed = float(np.clip(base_speed * congestion_factor, 5.0, 70.0))
 
         nodes.append(Vehicle(i, x, y, speed))
 
@@ -764,7 +799,109 @@ def print_c6_interpretation():
 
 
 
+# AV / SELF-DRIVING-CAR REAL-TIME READINESS ANALYSIS
+
+def compute_av_readiness(results):
+    """
+    For each protocol and fleet size, look up the global MAPE achieved at
+    the round corresponding to each AV latency budget (e.g. 1000ms / 100ms
+    per round = round 10) and flag whether that error is under the
+    AV_USABLE_MAPE_PCT threshold.
+
+    This reframes the same convergence-curve data already computed by
+    run_all_experiments() through an autonomous-vehicle lens: "if this were
+    a platooning system that needed a decision within X ms, would the speed
+    estimate have been good enough?" No new simulation is needed — this is
+    a different cut of the existing err_curve data.
+    """
+    av_table = {}
+
+    for N in NODE_COUNTS:
+        av_table[N] = {}
+
+        for key in ("uniform", "geo_weighted", "adaptive_gwg"):
+            err_curve = results[N][key]["err_curve"]
+            row = {}
+
+            for budget_ms in AV_LATENCY_BUDGETS_MS:
+                round_idx = max(1, budget_ms // AV_ROUND_LATENCY_MS)
+                round_idx = min(round_idx, len(err_curve))
+                mape_at_budget = err_curve[round_idx - 1]
+
+                row[budget_ms] = {
+                    "round": round_idx,
+                    "mape": mape_at_budget,
+                    "usable": mape_at_budget <= AV_USABLE_MAPE_PCT,
+                }
+
+            av_table[N][key] = row
+
+    return av_table
+
+
+def print_av_readiness(av_table):
+    print("\n" + "=" * 100)
+    print("AV / SELF-DRIVING FLEET REAL-TIME READINESS")
+    print("=" * 100)
+    print(
+        f"Assumption: 1 gossip round == {AV_ROUND_LATENCY_MS}ms V2V beacon interval "
+        f"(typical DSRC/C-V2X). 'Usable' means global MAPE <= {AV_USABLE_MAPE_PCT}% — "
+        f"tight enough for cooperative speed-advisory / platooning decisions.\n"
+    )
+
+    labels = {"uniform": "Uniform", "geo_weighted": "Fixed GWG", "adaptive_gwg": "Adaptive GWG"}
+
+    for N in NODE_COUNTS:
+        print(f"--- Fleet size N={N} ---")
+        header = "Protocol".ljust(14) + "".join(f"{b/1000:>8.1f}s".rjust(12) for b in AV_LATENCY_BUDGETS_MS)
+        print(header)
+
+        for key, label in labels.items():
+            row = av_table[N][key]
+            cells = []
+            for b in AV_LATENCY_BUDGETS_MS:
+                mape = row[b]["mape"]
+                mark = "OK" if row[b]["usable"] else "--"
+                cells.append(f"{mape:>6.1f}%({mark})".rjust(12))
+            print(label.ljust(14) + "".join(cells))
+        print()
+
+
 # PLOTS
+
+def plot_av_readiness(av_table, out_dir=OUT_DIR):
+    if plt is None:
+        return None
+
+    fig, axes = plt.subplots(1, len(NODE_COUNTS), figsize=(5.5 * len(NODE_COUNTS), 4), sharey=True)
+    if len(NODE_COUNTS) == 1:
+        axes = [axes]
+
+    fig.suptitle("AV Real-Time Readiness: Error vs Latency Budget", fontsize=13, fontweight="bold")
+
+    colors = {"uniform": "#E74C3C", "geo_weighted": "#2ECC71", "adaptive_gwg": "#3498DB"}
+    labels = {"uniform": "Uniform", "geo_weighted": "Fixed GWG", "adaptive_gwg": "Adaptive GWG"}
+    budgets_s = [b / 1000 for b in AV_LATENCY_BUDGETS_MS]
+
+    for ax, N in zip(axes, NODE_COUNTS):
+        for key in ("uniform", "geo_weighted", "adaptive_gwg"):
+            mapes = [av_table[N][key][b]["mape"] for b in AV_LATENCY_BUDGETS_MS]
+            ax.plot(budgets_s, mapes, "o-", color=colors[key], lw=2, label=labels[key])
+
+        ax.axhline(AV_USABLE_MAPE_PCT, color="gray", ls="--", alpha=0.7, label="Usable threshold")
+        ax.set_title(f"N={N}")
+        ax.set_xlabel("Latency budget (s)")
+        ax.set_ylabel("Global MAPE (%)")
+        ax.legend(fontsize=8)
+        ax.grid(alpha=0.3)
+
+    plt.tight_layout()
+    p = os.path.join(out_dir, "fig8_av_real_time_readiness.png")
+    plt.savefig(p, dpi=120, bbox_inches="tight")
+    plt.close()
+    print(f"Saved {p}")
+    return p
+
 
 def plot_results(results, out_dir=OUT_DIR):
     if plt is None:
@@ -939,6 +1076,11 @@ if __name__ == "__main__":
     print_summary_table(results)
     print_c6_interpretation()
     print_amdahl_analysis()
+
+    av_table = compute_av_readiness(results)
+    print_av_readiness(av_table)
+
     plot_results(results)
+    plot_av_readiness(av_table)
 
     print(f"\nDone in {time.time() - start_time:.1f}s")
