@@ -3,6 +3,8 @@
 venv/
 env/
 
+context.md
+
 # Python cache
 __pycache__/
 *.py[cod]
@@ -15,12 +17,18 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Large dataset files
+# Large / regenerable data files — see README.md "Running the pipeline"
+# to regenerate these in a couple of minutes from data/raw/
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
 *.parquet
-*.csv
 *.npy
 
-# Generated output images
+# Generated output figures — see README.md to regenerate
+results/figures/*
+!results/figures/.gitkeep
 fig*.png
 
 # Word temporary files
