@@ -37,3 +37,5 @@ fig*.png
 # Optional: local/editor files
 .vscode/
 .idea/
+# Python test cache
+.pytest_cache/
