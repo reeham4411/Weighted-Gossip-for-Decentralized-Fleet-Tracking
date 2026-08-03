@@ -83,6 +83,7 @@ these properties so they cannot regress silently.
 ├── scripts/
 │   ├── verify_pipeline.sh           one-command end-to-end verification
 │   ├── make_results_sections.py     results.json -> paper Sections V-VII
+│   ├── build_paper.py               assembles paper/FULL_PAPER.md (+ .docx)
 │   ├── audit_baseline_claims.py     evidence for the v1 defects
 │   └── audit_ablation.py            evidence that the v1 comparison was confounded
 ├── data/
@@ -90,11 +91,12 @@ these properties so they cannot regress silently.
 │   └── processed/                   nyc_speeds.npy (gitignored)
 ├── results/
 │   ├── results.json                 every number the paper cites — tracked
-│   └── figures/                     fig1-fig9 (gitignored, regenerate anytime)
+│   └── figures/                     fig1-fig10 (gitignored, regenerate anytime)
 ├── paper/
-│   ├── adaptive_gwg_paper.md        full paper, Sections I-IV and VIII
+│   ├── adaptive_gwg_paper.md        hand-written sections (I-IV, VIII)
 │   ├── RESULTS.md                   Sections V-VII — GENERATED, do not hand-edit
-│   └── NUMBERS.md                   claim -> evidence map — GENERATED
+│   ├── NUMBERS.md                   claim -> evidence map — GENERATED
+│   └── FULL_PAPER.md                the two spliced together — GENERATED
 └── docs/
     ├── PDC_A2_GWG_FINAL_WithTOC.docx original Assignment 2 system-design report
     ├── project_explained.md
@@ -131,9 +133,11 @@ pip install pandas pyarrow numpy matplotlib
    python3 src/gwg_simulation.py
    ```
 
-4. **Regenerate the paper's results sections** from that JSON:
+4. **Regenerate the paper's results sections** from that JSON, then assemble the
+   full document:
    ```bash
    python3 scripts/make_results_sections.py
+   python3 scripts/build_paper.py       # -> paper/FULL_PAPER.md (+ .docx via pandoc)
    ```
 
 Steps 3–4 are the only way paper numbers should ever change. `paper/RESULTS.md`

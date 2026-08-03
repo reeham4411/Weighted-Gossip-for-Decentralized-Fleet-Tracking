@@ -99,7 +99,8 @@ echo ""
 echo "== 6. Figures =="
 EXPECTED="fig1_convergence_curves.png fig2_final_mape.png fig3_attribution.png \
 fig4_hop_distance.png fig5_communication_cost.png fig6_churn.png \
-fig7_threshold_sensitivity.png fig8_av_readiness.png fig9_mobility.png"
+fig7_threshold_sensitivity.png fig8_av_readiness.png fig9_mobility.png \
+fig10_restart_interval.png"
 MISSING=0
 for f in $EXPECTED; do
     if [ ! -s "results/figures/$f" ]; then
@@ -107,7 +108,7 @@ for f in $EXPECTED; do
         MISSING=1; FAIL=1
     fi
 done
-[ "$MISSING" -eq 0 ] && echo "OK: all 9 figures present and non-empty"
+[ "$MISSING" -eq 0 ] && echo "OK: all 10 figures present and non-empty"
 
 echo ""
 echo "== 7. Paper sections regenerate =="
