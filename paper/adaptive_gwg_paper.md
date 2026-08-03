@@ -9,6 +9,26 @@ National University of Sciences and Technology, Islamabad, Pakistan
 > `results/results.json`, which is written by `src/gwg_simulation.py`. Every number below
 > is traceable to that file; none are transcribed by hand. See `paper/NUMBERS.md` for the
 > claim-to-evidence map.
+>
+> **The title needs a team decision.** The current title names the adaptive layer as the
+> contribution, and the evidence no longer supports that — Section VI-B finds the
+> improvement belongs to region confinement, with adaptation contributing nothing
+> measurable. Submitting under this title would promise a result the paper then retracts,
+> which reviewers read as overclaiming even when the body is honest. Three options, in
+> our order of preference:
+>
+> 1. *What Actually Makes Geo-Weighted Gossip Regional: An Ablation of Region-Aware
+>    Push-Sum for Vehicular Networks* — matches the finding, signals the ablation, and
+>    frames the negative result as the contribution it is.
+> 2. *Region Confinement, Not Region Adaptation: Revisiting Geo-Weighted Push-Sum Gossip
+>    for Vehicle Fleets* — sharper, states the result outright.
+> 3. Keep the current title and reframe the paper around the adaptive layer as the
+>    *object of study* rather than the proposal. Weakest option: the title still reads
+>    as a proposal.
+>
+> Option 1 or 2 also makes the paper a better fit for a reproducibility or
+> measurement-focused venue, where a well-controlled negative result is the point rather
+> than a disappointment.
 
 ---
 

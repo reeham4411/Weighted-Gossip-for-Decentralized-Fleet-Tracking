@@ -1,3 +1,19 @@
+> ## ⚠️ Superseded — v1 pipeline guide
+>
+> This is the run/push guide for the **v1** pipeline
+> (`src/legacy/gwg_simulation_v1.py`), including its file layout, its figure set, and
+> its conclusions. All three have changed.
+>
+> The "Key finding" section below states that Adaptive GWG's advantage comes from
+> density-driven region management. A controlled ablation has since shown it comes
+> from **region confinement** instead, and that adaptive region management adds
+> nothing measurable on top of a region-confined fixed grid. See
+> [`paper/RESULTS.md`](../paper/RESULTS.md) Section VI-B.
+>
+> For current run instructions use the root [`README.md`](../README.md).
+
+---
+
 # GWG Experiment Pipeline — Run & Push Guide (v2)
 
 ## What changed since v1
