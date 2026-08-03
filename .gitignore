@@ -39,3 +39,6 @@ fig*.png
 .idea/
 # Python test cache
 .pytest_cache/
+
+# Generated Word build of the paper (regenerate: python3 scripts/build_paper.py)
+paper/FULL_PAPER.docx

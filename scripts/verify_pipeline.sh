@@ -117,6 +117,11 @@ if $PY scripts/make_results_sections.py >/dev/null; then
     else
         echo "FAIL: generator ran but produced empty output"; FAIL=1
     fi
+    if $PY scripts/build_paper.py && [ -s paper/FULL_PAPER.md ]; then
+        echo "OK: paper/FULL_PAPER.md assembled"
+    else
+        echo "FAIL: scripts/build_paper.py could not assemble the paper"; FAIL=1
+    fi
 else
     echo "FAIL: scripts/make_results_sections.py exited non-zero"; FAIL=1
 fi

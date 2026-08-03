@@ -55,6 +55,8 @@ All error metrics are computed against the **fixed reporting partition**, identi
 
 Table II reports all four protocols at each fleet size, with mobility enabled and no churn, over 10 independent trials.
 
+Fig. 1 plots the convergence curves and Fig. 2 the final accuracy with intervals.
+
 **TABLE II. MAIN RESULTS (mobility on, no churn, 95% CI)**
 
 | N | Protocol | Macro MAPE % | Micro MAPE % | Converged | Hop (m) | B/vehicle | Cross-region % |
@@ -77,6 +79,8 @@ At the largest fleet size (N = 1000), Adaptive-GWG reaches **9.04% ± 0.33** mac
 ### B. Where the Improvement Actually Comes From
 
 This is the question the ablation exists to answer, and it is the one prior work in this space does not separate.
+
+Fig. 3 shows the same decomposition graphically.
 
 **TABLE III. CONTRIBUTION ATTRIBUTION (macro MAPE)**
 
@@ -110,6 +114,8 @@ One caveat on how to read this column for Adaptive-GWG. It is measured against t
 
 Adaptive-GWG is not free. At N = 1000 it sends **6312 B per vehicle** against **6300 B** for the confined fixed-grid baseline, an overhead of **0.2%**, from region-change announcements. Data-plane message counts are identical across protocols by construction — one exchange per vehicle per round — so the control traffic is the entire difference, and reporting it as free (as our earlier harness did) would have made the accuracy comparison meaningless.
 
+Fig. 4 reports mean hop distance and Fig. 5 the communication cost including control traffic.
+
 **TABLE IV. REGION-REFRESH INTERVAL (N = 500)**
 
 | τ (rounds) | Macro MAPE % | Control messages | B/vehicle |
@@ -131,6 +137,8 @@ Running push-sum on a moving fleet has a failure mode that a single end-of-run n
 
 The remedy is standard for push-sum over time-varying data: restart the accumulator periodically. The convergence curve sets the period — long enough to average, short enough that drift cannot accumulate. We apply it identically to every protocol, so it favours none of them.
 
+Fig. 10 plots the sweep.
+
 **TABLE V. PUSH-SUM RESTART INTERVAL (N = 500, steady-state macro MAPE %)**
 
 | Restart interval | Uniform Random Gossip | Fixed GWG | Fixed GWG (region-confined) | Adaptive-GWG |
@@ -146,6 +154,8 @@ Restarting every 20 rounds is best for both confined protocols, cutting Adaptive
 The most informative column is the leftmost. Uniform Random Gossip and Fixed GWG barely move across the entire sweep (30.6% → 24.0% and 30.4% → 21.7%). Restart repairs staleness, and staleness was never their problem — they are converging accurately to the wrong quantity, and no scheduling change fixes a target error. This is the cleanest confirmation in the paper that the error floor of Section VI-C is structural rather than an artifact of how long we ran the protocol.
 
 ### F. Mobility
+
+Fig. 9 shows the same comparison.
 
 **TABLE VI. STATIC VS MOBILE (N = 500)**
 
@@ -164,6 +174,8 @@ We note that Adaptive-GWG is **behind** the confined baseline in both conditions
 
 ### G. Churn
 
+Fig. 6 plots error against churn rate.
+
 **TABLE VII. PER-ROUND CHURN (N = 500)**
 
 | Churn ρ | Uniform Random Gossip | Fixed GWG | Fixed GWG (region-confined) | Adaptive-GWG |
@@ -179,6 +191,8 @@ Churn degrades Adaptive-GWG from 9.10% to 15.29% as the per-round departure prob
 The ordering between protocols is preserved at every churn rate tested, with Adaptive-GWG best throughout (9.10%–15.29%) and Uniform Random Gossip worst (24.08%–24.08%), so no conclusion in Section VI-B depends on the churn setting.
 
 ### H. Sensitivity to the Adaptive Thresholds
+
+Fig. 7 plots the sweep.
 
 **TABLE VIII. MERGE/SPLIT THRESHOLD SWEEP (N = 500)**
 
@@ -206,6 +220,8 @@ This bears directly on an obvious confound: that Adaptive-GWG might win merely b
 ### I. Real-Time Readiness for AV Consumers
 
 Treating one round as one 100 ms beacon interval [23], [24], Table VIII reports the error a protocol would hand a decision system at a given deadline. 'Usable' is macro MAPE ≤ 10%, an illustrative threshold for cooperative speed advisory rather than one derived from a standard.
+
+Fig. 8 plots error against the decision deadline.
 
 **TABLE IX. ERROR AT A DECISION DEADLINE (macro MAPE %)**
 
@@ -246,4 +262,22 @@ Two observations. Under mobility, error does not decrease monotonically with the
 **Statistical power.** Confidence intervals come from 10 independent trials. At N = 100 the intervals are wide relative to the differences between the weaker protocols, and we avoid claiming orderings there that the intervals do not support.
 
 **Prior-version correction.** An earlier version of this work reported per-region MAPE reductions of 34–96% attributable to adaptive regions. An audit (`scripts/audit_baseline_claims.py`, `scripts/audit_ablation.py`) found that result did not hold: the exchange was not push-sum, no ablation isolated confinement from adaptation, each protocol was scored against its own partition, and at the largest fleet size the adaptive rule had relabelled no vehicles at all. The present numbers supersede those entirely. We document this because the failure mode — a bundled comparison that credits the novel component with a simpler component's effect — is not specific to us and is easy to reproduce elsewhere.
+
+
+---
+
+## Figures
+
+All in `results/figures/`, regenerated by `python3 src/gwg_simulation.py`.
+
+- **fig1_convergence_curves.png** — Convergence of the per-region estimate, one panel per fleet size.
+- **fig2_final_mape.png** — Steady-state per-region MAPE with 95% CI.
+- **fig3_attribution.png** — Contribution attribution: what region confinement buys versus what adaptive region management adds on top of it.
+- **fig4_hop_distance.png** — Mean geographic distance per gossip exchange.
+- **fig5_communication_cost.png** — Bytes per vehicle, including region-management control traffic.
+- **fig6_churn.png** — Error against per-round churn rate.
+- **fig7_threshold_sensitivity.png** — Merge/split threshold sweep.
+- **fig8_av_readiness.png** — Error available within a V2X decision deadline.
+- **fig9_mobility.png** — Static versus mobile networks.
+- **fig10_restart_interval.png** — Push-sum restart interval sweep.
 
