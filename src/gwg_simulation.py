@@ -728,11 +728,18 @@ def run_once(protocol, n, speed_pool, seed,
                     push_sum_send(fleet, i, j)
                     # A confined protocol still has to let an isolated vehicle
                     # gossip, so it falls back to the full radio neighbourhood.
-                    # Every such exchange moves push-sum mass across a region
-                    # boundary and is an irreversible leak toward the global
-                    # mean. Counting them is what lets Section VI attribute the
-                    # residual error floor to a mechanism instead of guessing.
-                    if regions[j] != regions[i]:
+                    # Every such exchange moves push-sum mass across a boundary
+                    # of the REPORTING partition and is an irreversible leak
+                    # toward the global mean. Counting them is what lets
+                    # Section VI attribute the residual error floor to a
+                    # mechanism instead of guessing.
+                    #
+                    # Measured on the reporting partition, never on the
+                    # protocol's own regions: scored against its own labels a
+                    # confined protocol is trivially at 0% by construction, which
+                    # would say nothing about whether mass left the region the
+                    # metric actually cares about.
+                    if cells[j] != cells[i]:
                         cross_region_exchanges += 1
 
             est = fleet.estimates()

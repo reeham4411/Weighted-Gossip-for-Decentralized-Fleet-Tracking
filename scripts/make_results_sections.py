@@ -52,6 +52,7 @@ def main():
     refresh = {int(k): v for k, v in d["refresh_sweep"].items()}
     av = {int(k): v for k, v in d["av_readiness"].items()}
     sizes = sorted(main_r)
+    cells_total = cfg["grid_size"] ** 2
     big = sizes[-1]
     mid = sizes[len(sizes) // 2]
 
@@ -182,19 +183,48 @@ def main():
     fs, cs, as_ = (main_r[small]["fixed_gwg"]["macro_mape"],
                    main_r[small]["fixed_confined"]["macro_mape"],
                    main_r[small]["adaptive_gwg"]["macro_mape"])
-    w(f"Two things stand out. First, at N = {small} confinement **hurts** "
-      f"({pct(fs, cs):+.1f}%): with roughly one vehicle per cell, a confined vehicle "
-      f"seldom finds two same-cell peers, so it falls back to the unconfined "
-      f"neighbourhood anyway while having lost the chance to average with anyone "
-      f"stable. Confinement is only useful once cells are populated enough to gossip "
-      f"within. Second, adaptation delivers a positive gain at every fleet size "
-      f"({', '.join(f'{pct(main_r[n]['fixed_confined']['macro_mape'], main_r[n]['adaptive_gwg']['macro_mape']):+.1f}% at N={n}' for n in sizes)}), "
-      f"and it is largest exactly where confinement fails — which is the regime the "
-      f"merge rule was designed for.\n")
-    w("This is a narrower claim than 'adaptive regions are better'. It is also the claim "
-      "the evidence supports, and it is actionable: a deployment should enable the "
-      "adaptive layer when its cells are sparsely populated relative to the merge "
-      "threshold, and can skip it otherwise.\n")
+    w(f"The two mechanisms have **opposite density dependence**, and that is the "
+      f"central result of this paper.\n")
+    confine_gains = [pct(main_r[n]["fixed_gwg"]["macro_mape"],
+                         main_r[n]["fixed_confined"]["macro_mape"]) for n in sizes]
+    confine_str = ", ".join(
+        "{:+.1f}% at N={} ({:.0f} vehicles/cell)".format(g, n, n / cells_total)
+        for g, n in zip(confine_gains, sizes))
+    w(f"Region confinement is useless-to-harmful when cells are sparse and increasingly "
+      f"valuable as they fill: {confine_str}. "
+      f"At N = {small} it actively **hurts** ({pct(fs, cs):+.1f}%): with about "
+      f"{small/cells_total:.0f} vehicle per cell a confined vehicle seldom finds two "
+      f"same-cell peers, so it falls back to the unconfined neighbourhood anyway, having "
+      f"gained nothing and lost the larger candidate pool.\n")
+    adapt_gains = [pct(main_r[n]["fixed_confined"]["macro_mape"],
+                       main_r[n]["adaptive_gwg"]["macro_mape"]) for n in sizes]
+    adapt_str = ", ".join("{:+.1f}% at N={}".format(g, n)
+                          for g, n in zip(adapt_gains, sizes))
+    w(f"Adaptive region management runs the other way — it is largest exactly where "
+      f"confinement fails and decays to nothing as density rises: {adapt_str}. "
+      f"This is the regime the merge rule was designed for, and the sweep in "
+      f"Section VI-G confirms the mechanism.\n")
+    # Significance of the adaptation gain at the densest setting.
+    c_hi, c_ci = main_r[big]["fixed_confined"]["macro_mape"], main_r[big]["fixed_confined"]["macro_mape_ci95"]
+    a_hi, a_ci = main_r[big]["adaptive_gwg"]["macro_mape"], main_r[big]["adaptive_gwg"]["macro_mape_ci95"]
+    overlap = (a_hi - a_ci) <= (c_hi + c_ci)
+    if overlap:
+        w(f"We stress that the residual {adapt_gains[-1]:+.1f}% at N = {big} is **not "
+          f"statistically significant**: the intervals overlap "
+          f"({c_hi:.2f} ± {c_ci:.2f} against {a_hi:.2f} ± {a_ci:.2f}). At roughly "
+          f"{big/cells_total:.0f} vehicles per cell the merge rule finds almost nothing "
+          f"to merge, so Adaptive-GWG is close to the confined baseline by construction, "
+          f"and it charges control traffic (Section VI-D) for that equivalence. **At this "
+          f"density the adaptive layer should be switched off.**\n")
+    else:
+        w(f"At N = {big} the gain remains significant "
+          f"({c_hi:.2f} ± {c_ci:.2f} against {a_hi:.2f} ± {a_ci:.2f}).\n")
+    w("This is a narrower claim than 'adaptive regions are better', and a more useful "
+      "one. It is actionable: enable the adaptive layer when cells are sparsely "
+      "populated relative to the merge threshold — where it is worth up to "
+      f"{max(adapt_gains):.0f}% — and disable it when they are not, where it buys "
+      "nothing and costs bandwidth. A single averaged improvement figure across fleet "
+      "sizes would have hidden both halves of that guidance.\n")
 
     w("### C. The Error Floor of Unconfined Gossip\n")
     xr = {p: main_r[big][p]["cross_region_exchange_pct"] for p in ORDER}
@@ -216,12 +246,24 @@ def main():
       f"talks only to nearby vehicles feels like it should produce a local answer. It "
       f"does not: the exchange graph remains connected across the whole area, and mass "
       f"flows along it regardless of how short each individual hop is.\n")
-    w("The residual error of the confined variants has the same origin in miniature. A "
-      "confined vehicle with fewer than two same-region peers must fall back to the "
-      "wider neighbourhood or stop gossiping altogether; each fallback leaks mass "
-      "irreversibly across a boundary. Adaptive-GWG's merge rule attacks precisely this "
-      "leak by ensuring regions are populated enough that the fallback rarely fires, "
-      "which is why its cross-region rate is the lowest in the table.\n")
+    xr_s = {p: main_r[small][p]["cross_region_exchange_pct"] for p in ORDER}
+    w(f"The confined variants collapse this rate to near zero once cells are populated "
+      f"({main_r[big]['fixed_confined']['cross_region_exchange_pct']:.1f}% at N = {big}), "
+      f"and their accuracy improves correspondingly. At N = {small} they cannot: "
+      f"**{xr_s['fixed_confined']:.1f}%** of the confined baseline's exchanges still "
+      f"cross a boundary, because with about {small//cells_total} vehicle per cell the "
+      f"fallback rule fires almost every round. That is the mechanism behind the "
+      f"negative confinement gain in Table III, measured rather than inferred.\n")
+    w(f"One caveat on how to read this column for Adaptive-GWG. It is measured against "
+      f"the reporting partition for every protocol, so for the confined baselines it is "
+      f"pure leakage — their regions *are* the reporting cells. Adaptive-GWG's regions "
+      f"are deliberately not the reporting cells, so its rate "
+      f"({xr_s['adaptive_gwg']:.1f}% at N = {small}, "
+      f"{main_r[big]['adaptive_gwg']['cross_region_exchange_pct']:.1f}% at N = {big}) "
+      f"mixes leakage with intentional pooling across cells it has merged. It is "
+      f"therefore diagnostic for the baselines and only indicative for our protocol, and "
+      f"we do not read Adaptive-GWG's higher rate at N = {small} as a defect — it is the "
+      f"merge rule doing what it was designed to do.\n")
 
     w("### D. Cost of Adaptation\n")
     ab = main_r[big]["adaptive_gwg"]["bytes_per_node"]
@@ -285,16 +327,37 @@ def main():
     rates = sorted(churn)
     a0, ahi = churn[rates[0]]["adaptive_gwg"]["macro_mape"], churn[rates[-1]]["adaptive_gwg"]["macro_mape"]
     u0, uhi = churn[rates[0]]["uniform"]["macro_mape"], churn[rates[-1]]["uniform"]["macro_mape"]
-    w(f"Churn degrades Adaptive-GWG from {a0:.2f}% to {ahi:.2f}% as the per-round "
-      f"departure probability rises from {rates[0]:.0%} to {rates[-1]:.0%}, because a "
-      f"departing vehicle destroys the push-sum mass it holds and push-sum conserves "
-      f"mass only over a fixed population. The unconfined baselines are comparatively "
-      f"insensitive ({u0:.2f}% to {uhi:.2f}%) for an unflattering reason: they are "
-      f"already so far from the regional target that losing mass changes little. "
-      f"Robustness to churn is not a virtue when it is robustness of a wrong answer.\n")
-    w("Adaptive-GWG retains an advantage across the full churn range tested, but the "
-      "margin narrows, and we report this as a genuine limit of the approach rather "
-      "than as a favourable result.\n")
+    a_best_rate = min(rates, key=lambda r: churn[r]["adaptive_gwg"]["macro_mape"])
+    a_best = churn[a_best_rate]["adaptive_gwg"]["macro_mape"]
+    if a_best < a0:
+        w(f"The result here is counter-intuitive and we report it as measured: churn "
+          f"**improves** accuracy over part of the range. Adaptive-GWG goes from "
+          f"{a0:.2f}% at ρ = 0 to {a_best:.2f}% at ρ = {a_best_rate:.0%}, before "
+          f"worsening again to {ahi:.2f}% at ρ = {rates[-1]:.0%}. Every protocol shows "
+          f"the same pattern.\n")
+        w("The mechanism is the interaction between churn and mobility. Under mobility a "
+          "vehicle's push-sum mass goes stale: it reflects readings gathered in regions "
+          "it has since left, and only a boundary crossing resets it. A departing "
+          "vehicle destroys stale mass, and the arriving replacement injects a fresh, "
+          "correctly-localized reading. At low rates that flushing effect outweighs the "
+          "mass-conservation violation churn causes. At higher rates the loss of "
+          "accumulated averaging dominates and error climbs again.\n")
+        w("We flag this as a limitation of the evaluation as much as a property of the "
+          "protocol: it means our zero-churn configuration is not the most favourable "
+          "one, and that a deployment's error will depend on fleet turnover in a "
+          "non-monotone way. A staleness-aware reset rule — discarding mass on an age "
+          "bound rather than only on a boundary crossing — would likely capture the "
+          "benefit without relying on churn to deliver it, and we regard that as the "
+          "clearest actionable consequence of this experiment.\n")
+    else:
+        w(f"Churn degrades Adaptive-GWG from {a0:.2f}% to {ahi:.2f}% as the per-round "
+          f"departure probability rises from {rates[0]:.0%} to {rates[-1]:.0%}, because "
+          f"a departing vehicle destroys the push-sum mass it holds and push-sum "
+          f"conserves mass only over a fixed population.\n")
+    w(f"The ordering between protocols is preserved at every churn rate tested, with "
+      f"Adaptive-GWG best throughout ({a0:.2f}%–{max(churn[r]['adaptive_gwg']['macro_mape'] for r in rates):.2f}%) "
+      f"and Uniform Random Gossip worst ({min(churn[r]['uniform']['macro_mape'] for r in rates):.2f}%–{u0:.2f}%), "
+      f"so no conclusion in Section VI-B depends on the churn setting.\n")
 
     w("### G. Sensitivity to the Adaptive Thresholds\n")
     w("**TABLE VII. MERGE/SPLIT THRESHOLD SWEEP (N = 500)**\n")
@@ -308,20 +371,59 @@ def main():
           f"{v['macro_mape_ci95']:.2f} | {v['active_regions']:.1f} |")
     w("")
     w(f"Accuracy is governed almost entirely by the merge threshold n_min; the split "
-      f"threshold n_max has little effect at this density because few cells are dense "
-      f"enough to trigger a split. The best setting tested "
-      f"(n_min = {best['min']}, n_max = {best['max']}) gives {best['macro_mape']:.2f}% "
-      f"with {best['active_regions']:.0f} active regions; the worst "
-      f"(n_min = {worst['min']}, n_max = {worst['max']}) gives {worst['macro_mape']:.2f}% "
-      f"with {worst['active_regions']:.0f}.\n")
-    w("This sweep also rules out an obvious confound. One might suspect Adaptive-GWG "
-      "wins merely by producing coarser regions, which are internally more homogeneous "
-      "and therefore easier to estimate. The sweep shows the opposite: aggressive "
-      f"merging ({worst['active_regions']:.0f} regions) is the *worst* configuration, "
-      f"and the best keeps the partition close to the underlying grid "
-      f"({best['active_regions']:.0f} regions) while eliminating only those cells too "
-      "sparse to gossip within. The mechanism is repairing sparsity, not coarsening the "
-      "problem.\n")
+      f"threshold n_max has almost no effect at this density, because few cells hold "
+      f"enough vehicles to trigger a split at all. The best setting tested "
+      f"(n_min = {best['min']}, n_max = {best['max']}) gives {best['macro_mape']:.2f} ± "
+      f"{best['macro_mape_ci95']:.2f}% with {best['active_regions']:.0f} active regions; "
+      f"the worst (n_min = {worst['min']}, n_max = {worst['max']}) gives "
+      f"{worst['macro_mape']:.2f} ± {worst['macro_mape_ci95']:.2f}% with "
+      f"{worst['active_regions']:.0f}.\n")
+
+    # Group by n_min and report the trend honestly, whatever direction it runs.
+    by_min = {}
+    for v in sens.values():
+        by_min.setdefault(v["min"], []).append(v)
+    mins_sorted = sorted(by_min)
+    trend = ", ".join(
+        "n_min={} → {:.2f}% ({:.0f} regions)".format(
+            m, sum(x["macro_mape"] for x in by_min[m]) / len(by_min[m]),
+            sum(x["active_regions"] for x in by_min[m]) / len(by_min[m]))
+        for m in mins_sorted)
+    w(f"Reading down the merge threshold: {trend}.\n")
+    coarser_is_better = best["active_regions"] < worst["active_regions"]
+    if coarser_is_better:
+        w("We have to be careful about what this shows, because it points at a confound "
+          "rather than away from one. The best configurations here are also the "
+          "**coarsest**, and a coarser partition is internally more homogeneous, so part "
+          "of this gain may be the estimation problem becoming easier rather than the "
+          "protocol solving it better. Two considerations bound how much of the result "
+          "that explains.\n")
+        w(f"First, the effect is small and largely within the confidence intervals: "
+          f"everything from n_min = {mins_sorted[1]} upward lies in a "
+          f"{min(sum(x['macro_mape'] for x in by_min[m]) / len(by_min[m]) for m in mins_sorted[1:]):.1f}–"
+          f"{max(sum(x['macro_mape'] for x in by_min[m]) / len(by_min[m]) for m in mins_sorted[1:]):.1f}% "
+          f"band despite the active-region count varying by roughly "
+          f"{max(by_min[mins_sorted[1]][0]['active_regions'], best['active_regions']) / max(min(by_min[m][0]['active_regions'] for m in mins_sorted[1:]), 1):.0f}×. "
+          f"Coarsening is not buying much. The one clearly bad setting is "
+          f"n_min = {mins_sorted[0]}, which is too permissive to repair sparse cells at "
+          f"all.\n")
+        w(f"Second, and more decisively, the main comparison contradicts the pure "
+          f"coarsening explanation. At N = {big} the adaptive layer barely changes the "
+          f"partition and its advantage over the confined baseline correspondingly "
+          f"vanishes (Section VI-B). If coarseness alone drove the metric, the "
+          f"configuration that coarsens most would win at every density, and it does "
+          f"not. We therefore attribute the gain principally to sparsity repair, while "
+          f"noting that a residual coarsening bias is present and that our reporting "
+          f"partition — fixed and protocol-independent — bounds but does not eliminate "
+          f"it.\n")
+    else:
+        w(f"This bears directly on an obvious confound: that Adaptive-GWG might win "
+          f"merely by producing coarser, internally more homogeneous regions. The sweep "
+          f"argues against it — the most aggressive merging "
+          f"({worst['active_regions']:.0f} regions) is the worst configuration, while "
+          f"the best keeps the partition close to the underlying grid "
+          f"({best['active_regions']:.0f} regions) and repairs only those cells too "
+          f"sparse to gossip within.\n")
 
     w("### H. Real-Time Readiness for AV Consumers\n")
     w(f"Treating one round as one {cfg['round_duration_s']*1000:.0f} ms beacon interval "

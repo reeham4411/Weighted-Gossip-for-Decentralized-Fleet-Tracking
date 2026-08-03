@@ -1,132 +1,183 @@
-# Geo-Weighted Gossip (GWG) for Decentralized Fleet Tracking
+# Adaptive Region-Aware Geo-Weighted Push-Sum Gossip
 
-Parallel and Distributed Computing semester project — a leaderless gossip
-protocol for fleets of vehicles to compute live, per-region average speed
-without a central server, evaluated against real NYC TLC taxi trip data.
+A leaderless gossip protocol that lets a fleet of vehicles compute live,
+**per-region** average speed with no central server — evaluated against real NYC
+TLC taxi trip data, with vehicles in continuous motion.
 
 **Team:** Asma Imran (481920) · Fatima Ali (470708) · Adeena Reeham (480941)
 School of Electrical Engineering and Computer Science, NUST
 
-This repo contains three protocols compared head-to-head — Uniform Random
-Gossip, Fixed Geo-Weighted Gossip, and our own contribution, Adaptive
-Geo-Weighted Gossip (regions merge/split themselves based on vehicle
-density) — plus the research paper draft built on top of the results.
+Four protocols are compared head to head:
 
-## Key finding
+| Protocol | Peer candidates | Role |
+|---|---|---|
+| Uniform Random Gossip | any vehicle, geography ignored | baseline |
+| Fixed GWG | inverse-distance within radio range | baseline |
+| **Fixed GWG (region-confined)** | within range **and** own grid cell | **ablation** |
+| **Adaptive-GWG** | within range **and** own adaptive region | our protocol |
 
-Uniform Random Gossip and Fixed GWG don't just converge *slower* than
-Adaptive GWG — on real, spatially-structured speed data they don't converge
-to the right answer **at all**. Push-sum under uniform peer selection
-provably converges to the network-wide global average, not the regional
-one, so both baselines plateau at a permanent 18–35% MAPE no matter how
-many rounds run. Adaptive GWG, by letting regions adapt to density, reaches
-under 1% MAPE in a handful of rounds at larger fleet sizes. Full numbers
-are in [`paper/PAPER_RESULTS_SECTIONS_DRAFT.md`](paper/PAPER_RESULTS_SECTIONS_DRAFT.md).
+The third row is the one that matters methodologically. Without it, a comparison
+credits adaptive region management with an improvement that region confinement —
+a one-line change to the baseline — already delivers.
+
+## What we actually found
+
+Two mechanisms are usually bundled together under "adaptive geo-weighted gossip",
+and they have **opposite density dependence**:
+
+- **Region confinement** is useless-to-harmful when cells are sparse and
+  increasingly valuable as they fill (−16% at 1 vehicle/cell, +28% at 10).
+- **Adaptive region management** runs the other way: worth ~38% at 1 vehicle/cell,
+  and statistically indistinguishable from the confined baseline at 10.
+
+So the practical guidance is a switch, not a blanket claim: enable the adaptive
+layer where cells are sparse relative to the merge threshold; disable it where
+they are not, since it costs control traffic and buys nothing.
+
+Separately, **geographic weighting buys locality of communication, not locality of
+estimation.** Fixed GWG cuts mean hop distance by ~84% versus uniform gossip but
+barely improves accuracy: its exchanges still cross region boundaries, the gossip
+graph still spans the service area, and push-sum still converges toward the
+city-wide mean. Confinement, not weighting, is what makes an estimate regional.
+
+Exact figures, confidence intervals and the claim-to-evidence map:
+[`paper/RESULTS.md`](paper/RESULTS.md) and [`paper/NUMBERS.md`](paper/NUMBERS.md),
+both generated from `results/results.json`.
+
+### A correction to an earlier version of this work
+
+An earlier harness (kept at [`src/legacy/gwg_simulation_v1.py`](src/legacy/gwg_simulation_v1.py))
+reported 34–96% per-region MAPE reductions attributable to adaptive regions. That
+result did not survive audit and has been withdrawn. The audit is reproducible:
+
+```bash
+python3 scripts/audit_baseline_claims.py   # push-sum, mobility, metrics, statistics
+python3 scripts/audit_ablation.py          # the confounded comparison
+```
+
+It found that the exchange was symmetric rather than directional (so every
+push-sum weight stayed at 1.0 and the protocol was plain pairwise averaging);
+vehicles never moved, in a paper about mobile networks; each protocol was scored
+against its own partition of the fleet, so merging cells lowered reported error on
+its own; the merge rule assigned sparse vehicles a label the target region never
+adopted, so it never merged anything; message and bandwidth counts were identical
+by construction, making "comparable bandwidth" an identity rather than a result;
+non-converging runs were averaged in at the round cap; and at N=1000 — where the
+largest win was reported — the adaptive rule relabelled zero vehicles.
+
+The current numbers supersede those entirely. `tests/test_gwg.py` pins each of
+these properties so they cannot regress silently.
 
 ## Repo structure
 
 ```
 .
-├── README.md                  # you are here
-├── .gitignore
+├── README.md
 ├── src/
-│   ├── extract_speeds.py      # NYC TLC parquet -> data/processed/nyc_speeds.npy
-│   └── gwg_simulation.py      # runs all 3 protocols, produces results/figures/*
+│   ├── extract_speeds.py            NYC TLC parquet -> data/processed/nyc_speeds.npy
+│   ├── gwg_simulation.py            all protocols, experiments, figures, results.json
+│   └── legacy/
+│       └── gwg_simulation_v1.py     archived; kept so the audit stays reproducible
+├── tests/
+│   └── test_gwg.py                  25 protocol-correctness tests
 ├── scripts/
-│   └── verify_pipeline.sh     # one-command end-to-end smoke test
+│   ├── verify_pipeline.sh           one-command end-to-end verification
+│   ├── make_results_sections.py     results.json -> paper Sections V-VII
+│   ├── audit_baseline_claims.py     evidence for the v1 defects
+│   └── audit_ablation.py            evidence that the v1 comparison was confounded
 ├── data/
-│   ├── raw/                   # put downloaded yellow_tripdata_*.parquet files here (gitignored)
-│   └── processed/             # nyc_speeds.npy lands here (gitignored, regenerate anytime)
+│   ├── raw/                         yellow_tripdata_*.parquet (gitignored)
+│   └── processed/                   nyc_speeds.npy (gitignored)
 ├── results/
-│   └── figures/                # fig1-fig8 .png output (gitignored, regenerate anytime)
-├── docs/
-│   ├── PDC_A2_GWG_FINAL_WithTOC.docx   # original Assignment 2 system-design report
-│   ├── project_explained.md
-│   └── EXPERIMENT_README.md            # detailed pipeline run/push guide (v2)
-└── paper/
-    └── PAPER_RESULTS_SECTIONS_DRAFT.md # IEEE paper Sections V-VII, drafted from real results
+│   ├── results.json                 every number the paper cites — tracked
+│   └── figures/                     fig1-fig9 (gitignored, regenerate anytime)
+├── paper/
+│   ├── adaptive_gwg_paper.md        full paper, Sections I-IV and VIII
+│   ├── RESULTS.md                   Sections V-VII — GENERATED, do not hand-edit
+│   └── NUMBERS.md                   claim -> evidence map — GENERATED
+└── docs/
+    ├── PDC_A2_GWG_FINAL_WithTOC.docx original Assignment 2 system-design report
+    ├── project_explained.md
+    └── EXPERIMENT_README.md
 ```
 
-`data/` and `results/` are gitignored on purpose — both are fully
-reproducible from the parquet source + scripts in a couple of minutes, and
-keeping them out of git keeps the repo small regardless of how many months
-of taxi data you add.
+`data/` and `results/figures/` are gitignored because both regenerate in minutes
+from the parquet source. `results/results.json` **is** tracked — it is the
+evidence the paper's numbers are checked against.
 
 ## Setup
 
 ```bash
 python3 -m venv venv
-source venv/bin/activate          # Windows: venv\Scripts\activate
-pip install pandas pyarrow numpy matplotlib --break-system-packages
+source venv/bin/activate            # Windows: venv\Scripts\activate
+pip install pandas pyarrow numpy matplotlib
 ```
 
 ## Running the pipeline
 
-1. **Get real NYC TLC Yellow Taxi data.** Download one or more months from
-   https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page and drop
-   them into `data/raw/`, named like `yellow_tripdata_2026-01.parquet`.
-   You can use as many months as you want — everything below auto-detects
-   and combines all of them, no code changes needed.
+1. **Get real NYC TLC data.** Download one or more months from
+   <https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page> into `data/raw/`,
+   named `yellow_tripdata_YYYY-MM.parquet`. Every matching file is combined
+   automatically; no code change is needed to add months.
 
-2. **Extract speeds:**
+2. **Extract speeds** — prints per-file counts and the distribution:
    ```bash
    python3 src/extract_speeds.py
    ```
-   Prints per-file and combined sample counts, the speed distribution, and
-   the resulting file size. Output: `data/processed/nyc_speeds.npy`.
 
-3. **Run the simulation:**
+3. **Run everything** — main comparison, churn sweep, mobility sweep, threshold
+   sweep, refresh sweep, AV analysis, 9 figures, and `results/results.json`:
    ```bash
    python3 src/gwg_simulation.py
    ```
-   Takes roughly 20–90 seconds depending on how much data you combined.
-   Produces a terminal results table, C-6 novelty interpretation, Amdahl's/
-   Gustafson's Law analysis, an AV real-time-readiness table, and 8 PNGs in
-   `results/figures/`.
 
-## Testing / verifying everything still behaves correctly
+4. **Regenerate the paper's results sections** from that JSON:
+   ```bash
+   python3 scripts/make_results_sections.py
+   ```
 
-Before pushing any change to `src/extract_speeds.py` or
-`src/gwg_simulation.py`, run the smoke test from the repo root:
+Steps 3–4 are the only way paper numbers should ever change. `paper/RESULTS.md`
+and `paper/NUMBERS.md` are generated files — edit the generator, not the output.
+
+## Before you push
 
 ```bash
 bash scripts/verify_pipeline.sh
 ```
 
-It re-runs both scripts and checks: raw data is present, the extracted
-speed sample count and range are sane (5–70mph, plausible mean), the
-simulation exits cleanly, all 8 figures are written and non-empty, and the
-results table actually printed. It exits non-zero and prints exactly what
-failed if anything's off — safe to run before every push.
+Checks raw data, extraction sanity, **the protocol test suite**, a clean
+simulation run, every field the paper generator reads, all 9 figures, and that
+the paper sections regenerate. Exits non-zero naming what failed.
 
-## Extending to more months
+Running the tests is the part that matters. This project has already shipped a
+pipeline that ran cleanly end to end while computing the wrong quantity; a green
+run is not evidence that the results mean anything.
 
-Just add more `yellow_tripdata_*.parquet` files to `data/raw/` and re-run
-steps 2–3 above. More months = a larger, more representative real-world
-speed distribution, which strengthens the "real data" claim in the paper.
-`nyc_speeds.npy` is saved as float32 to keep the combined file reasonably
-small even across several months (~11MB per month of NYC yellow taxi data,
-roughly — check the printed size after running `extract_speeds.py`).
+```bash
+python3 tests/test_gwg.py          # or: python3 -m pytest tests/ -q
+```
 
 ## Pushing changes
 
 ```bash
-git checkout -b <short-description-of-your-change>
-# make your changes
-bash scripts/verify_pipeline.sh   # must pass before you push
+git checkout -b short-description-of-your-change
+# make changes
+bash scripts/verify_pipeline.sh    # must pass
 git add -A
-git commit -m "clear description of what changed and why"
-git push origin <branch-name>
+git commit -m "what changed and why"
+git push origin short-description-of-your-change
 ```
-Then open a PR into `main` on GitHub. `data/`, `results/figures/`, and the
-raw parquet files won't show up in `git status` — that's expected, they're
-gitignored.
 
-## Paper draft
+Then open a PR into `main`. The parquet files, `nyc_speeds.npy` and
+`results/figures/` will not appear in `git status` — they are gitignored by design.
 
-See `docs/PDC_A2_GWG_FINAL_WithTOC.docx` for the original Assignment 2
-system-design report (protocol design, Amdahl/Gustafson analysis) and
-`paper/PAPER_RESULTS_SECTIONS_DRAFT.md` for drafted IEEE paper text
-(Sections V–VII) built directly from the real-data results above — pull
-the numbers/prose from there into the actual paper draft as Section
-III/IV get written up.
+## Extending the evaluation
+
+- **More months of data:** drop more parquet files into `data/raw/`, re-run
+  steps 2–3. `nyc_speeds.npy` is stored as float32 to keep the combined file small
+  (~11 MB per month).
+- **Different densities:** the density regime is set by `N / GRID_SIZE²`, not by
+  fleet size alone. To probe the regime boundary, vary `NODE_COUNTS` or
+  `GRID_SIZE` in `src/gwg_simulation.py`.
+- **A road-constrained mobility trace** would be the single most valuable
+  improvement — see the limitations section of the paper.
