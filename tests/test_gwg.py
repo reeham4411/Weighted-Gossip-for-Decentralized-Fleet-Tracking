@@ -118,6 +118,38 @@ def test_dense_cells_split():
     assert stats["active_regions"] > 1, "dense cell was not split"
 
 
+def test_region_labels_are_stable_across_rounds():
+    """
+    Region ids must name the geography they cover, not a counter. With a
+    counter, the ids get renumbered whenever the iteration order of occupied
+    cells shifts -- which mobility guarantees -- so vehicles that never left
+    their region appear to have changed region, and each one then pays a
+    spurious push-sum reset and a spurious control message.
+    """
+    f = _fleet(600, seed=77)
+    _, cells = G.build_spatial_buckets(f)
+    labels_a, _ = G.adaptive_partition(f, cells)
+
+    # Same positions, different vehicle ordering: the partition must be identical.
+    perm = np.random.default_rng(0).permutation(f.n)
+    g = _fleet(600, seed=77)
+    g.x, g.y = f.x[perm].copy(), f.y[perm].copy()
+    g.true_speed = f.true_speed[perm].copy()
+    _, gcells = G.build_spatial_buckets(g)
+    labels_b, _ = G.adaptive_partition(g, gcells)
+    assert np.array_equal(labels_a[perm], labels_b), (
+        "partition depends on vehicle indexing, not geography")
+
+    # One round of driving must not relabel vehicles wholesale.
+    f.step_mobility()
+    _, cells2 = G.build_spatial_buckets(f)
+    labels_c, _ = G.adaptive_partition(f, cells2)
+    churned = float(np.mean(labels_c != labels_a))
+    assert churned < 0.10, (
+        f"{churned:.1%} of vehicles changed region label after a single round "
+        f"of driving -- labels are not stable")
+
+
 def test_reporting_partition_is_protocol_independent():
     """
     Every protocol must be scored against the same ground truth. v1 scored each

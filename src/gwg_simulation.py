@@ -406,14 +406,25 @@ def adaptive_partition(fleet, cells,
     labels = np.full(fleet.n, -1, dtype=np.int64)
     region_members = {}      # label -> list of indices
     region_centroid = {}     # label -> (x, y)
-    next_label = 0
-    sparse_units = []        # groups too small to stand alone
+    sparse_units = []        # (members, anchor_cell) groups too small to stand alone
     n_sparse = n_dense = 0
 
-    def register(members):
-        nonlocal next_label
-        lab = next_label
-        next_label += 1
+    n_cells = GRID_SIZE * GRID_SIZE
+
+    def label_for_cell(cell):
+        """Canonical id of an intact cell."""
+        return int(cell)
+
+    def label_for_quadrant(cell, qx, qy):
+        """Canonical id of a quadrant of a split cell."""
+        return int(n_cells + cell * 4 + qx * 2 + qy)
+
+    def register(members, lab):
+        # Region ids are derived from the geography they cover, never from a
+        # counter. A counter renumbers regions whenever the iteration order of
+        # occupied cells shifts -- which mobility guarantees -- and every
+        # renumbered vehicle then looks like it changed region, triggering a
+        # spurious push-sum reset and a spurious control message.
         region_members[lab] = list(members)
         region_centroid[lab] = (
             float(np.mean(fleet.x[members])),
@@ -423,7 +434,10 @@ def adaptive_partition(fleet, cells,
             labels[m] = lab
         return lab
 
-    for cell, members in groups.items():
+    # Iterate cells in sorted order so the partition is a pure function of
+    # positions, independent of vehicle indexing.
+    for cell in sorted(groups):
+        members = groups[cell]
         count = len(members)
         if count > max_nodes:
             n_dense += 1
@@ -434,24 +448,24 @@ def adaptive_partition(fleet, cells,
             for m in members:
                 q = (0 if fleet.x[m] < x_mid else 1, 0 if fleet.y[m] < y_mid else 1)
                 quads[q].append(m)
-            for q_members in quads.values():
+            for (qx, qy), q_members in sorted(quads.items()):
                 if len(q_members) >= min_nodes:
-                    register(q_members)
+                    register(q_members, label_for_quadrant(cell, qx, qy))
                 else:
-                    sparse_units.append(q_members)
+                    sparse_units.append((q_members, cell))
         elif count < min_nodes:
             n_sparse += 1
-            sparse_units.append(members)
+            sparse_units.append((members, cell))
         else:
-            register(members)
+            register(members, label_for_cell(cell))
 
     # Merge each sparse unit into the nearest established region.
     if region_members:
-        for unit in sparse_units:
+        for unit, _anchor in sparse_units:
             ux = float(np.mean(fleet.x[unit]))
             uy = float(np.mean(fleet.y[unit]))
             best = min(
-                region_centroid,
+                sorted(region_centroid),
                 key=lambda lab: (region_centroid[lab][0] - ux) ** 2
                 + (region_centroid[lab][1] - uy) ** 2,
             )
@@ -460,25 +474,28 @@ def adaptive_partition(fleet, cells,
             region_members[best].extend(unit)
     elif sparse_units:
         # Every cell is sparse (very low density). Agglomerate sparse units with
-        # their nearest neighbour until each pooled region can stand alone.
-        units = [list(u) for u in sparse_units]
+        # their nearest neighbour until each pooled region can stand alone. The
+        # surviving unit's lowest anchor cell names the region, so the label
+        # stays put across rounds as long as the grouping does.
+        units = [(list(u), a) for u, a in sparse_units]
         while True:
-            small = [k for k, u in enumerate(units) if len(u) < min_nodes]
+            small = [k for k, (u, _) in enumerate(units) if len(u) < min_nodes]
             if not small or len(units) == 1:
                 break
-            k = min(small, key=lambda t: len(units[t]))
-            ux = float(np.mean(fleet.x[units[k]]))
-            uy = float(np.mean(fleet.y[units[k]]))
+            k = min(small, key=lambda t: (len(units[t][0]), units[t][1]))
+            ux = float(np.mean(fleet.x[units[k][0]]))
+            uy = float(np.mean(fleet.y[units[k][0]]))
             others = [t for t in range(len(units)) if t != k]
             j = min(
                 others,
-                key=lambda t: (float(np.mean(fleet.x[units[t]])) - ux) ** 2
-                + (float(np.mean(fleet.y[units[t]])) - uy) ** 2,
+                key=lambda t: ((float(np.mean(fleet.x[units[t][0]])) - ux) ** 2
+                               + (float(np.mean(fleet.y[units[t][0]])) - uy) ** 2,
+                               units[t][1]),
             )
-            units[j].extend(units[k])
+            units[j] = (units[j][0] + units[k][0], min(units[j][1], units[k][1]))
             units.pop(k)
-        for u in units:
-            register(u)
+        for u, anchor in units:
+            register(u, label_for_cell(anchor))
 
     stats = {
         "sparse_cells": n_sparse,
@@ -673,6 +690,7 @@ def run_once(protocol, n, speed_pool, seed,
         active_regions_seen = [rstats["active_regions"]]
         convergence_round = None
         order = np.arange(n)
+        cross_region_exchanges = 0
 
         for rnd in range(1, max_rounds + 1):
             fleet.step_mobility()
@@ -704,9 +722,18 @@ def run_once(protocol, n, speed_pool, seed,
 
             rng.shuffle(order)
             for i in order:
-                j = select_peer(protocol, fleet, buckets, cells, regions, int(i), rng)
+                i = int(i)
+                j = select_peer(protocol, fleet, buckets, cells, regions, i, rng)
                 if j is not None:
-                    push_sum_send(fleet, int(i), j)
+                    push_sum_send(fleet, i, j)
+                    # A confined protocol still has to let an isolated vehicle
+                    # gossip, so it falls back to the full radio neighbourhood.
+                    # Every such exchange moves push-sum mass across a region
+                    # boundary and is an irreversible leak toward the global
+                    # mean. Counting them is what lets Section VI attribute the
+                    # residual error floor to a mechanism instead of guessing.
+                    if regions[j] != regions[i]:
+                        cross_region_exchanges += 1
 
             est = fleet.estimates()
             report = reporting_partition(cells)
@@ -731,6 +758,8 @@ def run_once(protocol, n, speed_pool, seed,
             "control_messages": fleet.control_messages,
             "total_bytes_per_node": fleet.bytes_sent / n,
             "avg_active_regions": float(np.mean(active_regions_seen)),
+            "cross_region_exchange_pct":
+                cross_region_exchanges / max(fleet.exchanges, 1) * 100.0,
         }
     finally:
         MOBILITY_ENABLED = prev_mobility
@@ -793,6 +822,8 @@ def summarize(runs):
         "data_messages": float(np.mean([r["data_messages"] for r in runs])),
         "control_messages": float(np.mean([r["control_messages"] for r in runs])),
         "avg_active_regions": float(np.mean([r["avg_active_regions"] for r in runs])),
+        "cross_region_exchange_pct":
+            float(np.mean([r["cross_region_exchange_pct"] for r in runs])),
         "micro_curve": micro_curve,
         "macro_curve": macro_curve,
         "curve_len": curve_len,
@@ -939,12 +970,13 @@ def compute_av_readiness(main):
 # ---------------------------------------------------------------------------
 
 def print_main_table(main):
-    print("\n" + "=" * 108)
+    print("\n" + "=" * 122)
     print("MAIN RESULTS  (mobility on, no churn, 95% CI over independent trials)")
-    print("=" * 108)
+    print("=" * 122)
+    print("x-region % = share of exchanges that moved mass across a region boundary.")
     print(f"{'N':>5} | {'Protocol':>27} | {'macro MAPE %':>16} | {'micro MAPE %':>16} | "
-          f"{'conv (med)':>11} | {'hop m':>7} | {'B/node':>8}")
-    print("-" * 108)
+          f"{'conv (med)':>11} | {'hop m':>7} | {'B/node':>8} | {'x-region %':>10}")
+    print("-" * 122)
     for n in sorted(main):
         for proto in PROTOCOLS:
             s = main[n][proto]
@@ -954,8 +986,9 @@ def print_main_table(main):
             print(f"{n:>5} | {PROTOCOL_LABELS[proto]:>27} | "
                   f"{s['macro_mape']:>9.2f} ±{s['macro_mape_ci95']:<5.2f} | "
                   f"{s['micro_mape']:>9.2f} ±{s['micro_mape_ci95']:<5.2f} | "
-                  f"{conv:>11} | {s['avg_hop_m']:>7.1f} | {s['bytes_per_node']:>8.0f}")
-        print("-" * 108)
+                  f"{conv:>11} | {s['avg_hop_m']:>7.1f} | {s['bytes_per_node']:>8.0f} | "
+                  f"{s['cross_region_exchange_pct']:>10.1f}")
+        print("-" * 122)
 
 
 def print_attribution(main):
