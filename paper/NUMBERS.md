@@ -8,31 +8,31 @@ Source: `results/results.json` (seed 42, 10 trials, 150 rounds).
 |---|---|---|
 | Dataset size | 12,870,597 samples | `config.dataset_samples` |
 | Dataset mean / sd | 11.63 / 6.25 mph | `config.dataset_mean_mph`, `.dataset_std_mph` |
-| N=100 Uniform Random Gossip macro MAPE | 40.28 ± 5.65% | `main.100.uniform.macro_mape` |
-| N=100 Fixed GWG macro MAPE | 36.61 ± 5.21% | `main.100.fixed_gwg.macro_mape` |
-| N=100 Fixed GWG (region-confined) macro MAPE | 42.47 ± 6.61% | `main.100.fixed_confined.macro_mape` |
-| N=100 Adaptive-GWG macro MAPE | 26.37 ± 2.97% | `main.100.adaptive_gwg.macro_mape` |
-| N=500 Uniform Random Gossip macro MAPE | 32.33 ± 2.69% | `main.500.uniform.macro_mape` |
-| N=500 Fixed GWG macro MAPE | 32.14 ± 2.63% | `main.500.fixed_gwg.macro_mape` |
-| N=500 Fixed GWG (region-confined) macro MAPE | 25.06 ± 2.78% | `main.500.fixed_confined.macro_mape` |
-| N=500 Adaptive-GWG macro MAPE | 19.63 ± 2.53% | `main.500.adaptive_gwg.macro_mape` |
-| N=1000 Uniform Random Gossip macro MAPE | 26.71 ± 0.87% | `main.1000.uniform.macro_mape` |
-| N=1000 Fixed GWG macro MAPE | 25.79 ± 1.61% | `main.1000.fixed_gwg.macro_mape` |
-| N=1000 Fixed GWG (region-confined) macro MAPE | 18.55 ± 1.09% | `main.1000.fixed_confined.macro_mape` |
-| N=1000 Adaptive-GWG macro MAPE | 18.31 ± 1.18% | `main.1000.adaptive_gwg.macro_mape` |
-| Adaptive vs Uniform at N=1000 | 31% reduction | derived from `main.1000` |
-| Gain from confinement, N=100 | -16.0% | derived from `main.100` |
-| Gain from adaptation, N=100 | +37.9% | derived from `main.100` |
-| Gain from confinement, N=500 | +22.0% | derived from `main.500` |
-| Gain from adaptation, N=500 | +21.7% | derived from `main.500` |
-| Gain from confinement, N=1000 | +28.1% | derived from `main.1000` |
-| Gain from adaptation, N=1000 | +1.3% | derived from `main.1000` |
+| N=100 Uniform Random Gossip macro MAPE | 28.19 ± 3.33% | `main.100.uniform.macro_mape` |
+| N=100 Fixed GWG macro MAPE | 21.74 ± 2.09% | `main.100.fixed_gwg.macro_mape` |
+| N=100 Fixed GWG (region-confined) macro MAPE | 19.59 ± 1.93% | `main.100.fixed_confined.macro_mape` |
+| N=100 Adaptive-GWG macro MAPE | 19.60 ± 2.03% | `main.100.adaptive_gwg.macro_mape` |
+| N=500 Uniform Random Gossip macro MAPE | 23.98 ± 0.99% | `main.500.uniform.macro_mape` |
+| N=500 Fixed GWG macro MAPE | 20.92 ± 0.93% | `main.500.fixed_gwg.macro_mape` |
+| N=500 Fixed GWG (region-confined) macro MAPE | 8.91 ± 0.53% | `main.500.fixed_confined.macro_mape` |
+| N=500 Adaptive-GWG macro MAPE | 9.20 ± 0.52% | `main.500.adaptive_gwg.macro_mape` |
+| N=1000 Uniform Random Gossip macro MAPE | 20.32 ± 0.50% | `main.1000.uniform.macro_mape` |
+| N=1000 Fixed GWG macro MAPE | 17.39 ± 0.48% | `main.1000.fixed_gwg.macro_mape` |
+| N=1000 Fixed GWG (region-confined) macro MAPE | 9.03 ± 0.32% | `main.1000.fixed_confined.macro_mape` |
+| N=1000 Adaptive-GWG macro MAPE | 9.04 ± 0.33% | `main.1000.adaptive_gwg.macro_mape` |
+| Adaptive vs Uniform at N=1000 | 55% reduction | derived from `main.1000` |
+| Gain from confinement, N=100 | +9.9% | derived from `main.100` |
+| Gain from adaptation, N=100 | -0.1% | derived from `main.100` |
+| Gain from confinement, N=500 | +57.4% | derived from `main.500` |
+| Gain from adaptation, N=500 | -3.3% | derived from `main.500` |
+| Gain from confinement, N=1000 | +48.1% | derived from `main.1000` |
+| Gain from adaptation, N=1000 | -0.2% | derived from `main.1000` |
 | Cross-region exchanges, Fixed GWG, N=1000 | 68.9% | `main.1000.fixed_gwg.cross_region_exchange_pct` |
 | Cross-region exchanges, Adaptive-GWG, N=1000 | 0.1% | `main.1000.adaptive_gwg.cross_region_exchange_pct` |
 | Control-traffic overhead at N=1000 | 0.2% | derived from `main.1000.*.bytes_per_node` |
-| Mobility degradation, Adaptive-GWG | 3.03% → 20.36% | `mobility.static/mobile.adaptive_gwg.macro_mape` |
-| Churn degradation, Adaptive-GWG | 20.36% → 16.22% | `churn.*.adaptive_gwg.macro_mape` |
-| Best threshold setting | n_min=8, n_max=12 → 19.59% | `threshold_sensitivity` |
+| Mobility degradation, Adaptive-GWG | 7.55% → 9.10% | `mobility.static/mobile.adaptive_gwg.macro_mape` |
+| Churn degradation, Adaptive-GWG | 9.10% → 15.29% | `churn.*.adaptive_gwg.macro_mape` |
+| Best threshold setting | n_min=2, n_max=20 → 8.71% | `threshold_sensitivity` |
 
 ## Properties enforced by tests
 

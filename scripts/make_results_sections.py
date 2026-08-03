@@ -54,6 +54,7 @@ def main():
     sizes = sorted(main_r)
     cells_total = cfg["grid_size"] ** 2
     big = sizes[-1]
+    small = sizes[0]
     mid = sizes[len(sizes) // 2]
 
     L = []
@@ -179,52 +180,66 @@ def main():
         w(f"| {n} | {f:.2f}% | {c:.2f}% | {a:.2f}% | {pct(f, c):+.1f}% | {pct(c, a):+.1f}% |")
     w("")
 
-    small = sizes[0]
-    fs, cs, as_ = (main_r[small]["fixed_gwg"]["macro_mape"],
-                   main_r[small]["fixed_confined"]["macro_mape"],
-                   main_r[small]["adaptive_gwg"]["macro_mape"])
-    w(f"The two mechanisms have **opposite density dependence**, and that is the "
-      f"central result of this paper.\n")
     confine_gains = [pct(main_r[n]["fixed_gwg"]["macro_mape"],
                          main_r[n]["fixed_confined"]["macro_mape"]) for n in sizes]
+    adapt_gains = [pct(main_r[n]["fixed_confined"]["macro_mape"],
+                       main_r[n]["adaptive_gwg"]["macro_mape"]) for n in sizes]
+
+    def separates(n):
+        """Do the confined and adaptive 95% intervals separate at this N?"""
+        c, a = main_r[n]["fixed_confined"], main_r[n]["adaptive_gwg"]
+        return (a["macro_mape"] + a["macro_mape_ci95"] < c["macro_mape"] - c["macro_mape_ci95"]
+                or c["macro_mape"] + c["macro_mape_ci95"] < a["macro_mape"] - a["macro_mape_ci95"])
+
     confine_str = ", ".join(
         "{:+.1f}% at N={} ({:.0f} vehicles/cell)".format(g, n, n / cells_total)
         for g, n in zip(confine_gains, sizes))
-    w(f"Region confinement is useless-to-harmful when cells are sparse and increasingly "
-      f"valuable as they fill: {confine_str}. "
-      f"At N = {small} it actively **hurts** ({pct(fs, cs):+.1f}%): with about "
-      f"{small/cells_total:.0f} vehicle per cell a confined vehicle seldom finds two "
-      f"same-cell peers, so it falls back to the unconfined neighbourhood anyway, having "
-      f"gained nothing and lost the larger candidate pool.\n")
-    adapt_gains = [pct(main_r[n]["fixed_confined"]["macro_mape"],
-                       main_r[n]["adaptive_gwg"]["macro_mape"]) for n in sizes]
     adapt_str = ", ".join("{:+.1f}% at N={}".format(g, n)
                           for g, n in zip(adapt_gains, sizes))
-    w(f"Adaptive region management runs the other way — it is largest exactly where "
-      f"confinement fails and decays to nothing as density rises: {adapt_str}. "
-      f"This is the regime the merge rule was designed for, and the sweep in "
-      f"Section VI-G confirms the mechanism.\n")
-    # Significance of the adaptation gain at the densest setting.
-    c_hi, c_ci = main_r[big]["fixed_confined"]["macro_mape"], main_r[big]["fixed_confined"]["macro_mape_ci95"]
-    a_hi, a_ci = main_r[big]["adaptive_gwg"]["macro_mape"], main_r[big]["adaptive_gwg"]["macro_mape_ci95"]
-    overlap = (a_hi - a_ci) <= (c_hi + c_ci)
-    if overlap:
-        w(f"We stress that the residual {adapt_gains[-1]:+.1f}% at N = {big} is **not "
-          f"statistically significant**: the intervals overlap "
-          f"({c_hi:.2f} ± {c_ci:.2f} against {a_hi:.2f} ± {a_ci:.2f}). At roughly "
-          f"{big/cells_total:.0f} vehicles per cell the merge rule finds almost nothing "
-          f"to merge, so Adaptive-GWG is close to the confined baseline by construction, "
-          f"and it charges control traffic (Section VI-D) for that equivalence. **At this "
-          f"density the adaptive layer should be switched off.**\n")
-    else:
-        w(f"At N = {big} the gain remains significant "
-          f"({c_hi:.2f} ± {c_ci:.2f} against {a_hi:.2f} ± {a_ci:.2f}).\n")
-    w("This is a narrower claim than 'adaptive regions are better', and a more useful "
-      "one. It is actionable: enable the adaptive layer when cells are sparsely "
-      "populated relative to the merge threshold — where it is worth up to "
-      f"{max(adapt_gains):.0f}% — and disable it when they are not, where it buys "
-      "nothing and costs bandwidth. A single averaged improvement figure across fleet "
-      "sizes would have hidden both halves of that guidance.\n")
+    ci_str = "; ".join(
+        "N={}: {:.2f} +/- {:.2f} against {:.2f} +/- {:.2f}".format(
+            n, main_r[n]["fixed_confined"]["macro_mape"],
+            main_r[n]["fixed_confined"]["macro_mape_ci95"],
+            main_r[n]["adaptive_gwg"]["macro_mape"],
+            main_r[n]["adaptive_gwg"]["macro_mape_ci95"])
+        for n in sizes)
+
+    w(f"**Region confinement accounts for the entire improvement.** Restricting peer "
+      f"selection to the sender's own cell — a one-line change to the fixed-grid "
+      f"baseline — is worth {confine_str}.\n")
+    w(f"**Adaptive region management adds nothing measurable on top of it:** "
+      f"{adapt_str}. Every one of these is negative or negligible, and at no fleet size "
+      f"do the two confidence intervals separate ({ci_str}). Adaptive-GWG additionally "
+      f"carries region-management control traffic that the confined baseline does not "
+      f"(Section VI-D).\n")
+    if any(separates(n) for n in sizes):
+        w("(The intervals do separate at "
+          + ", ".join(f"N={n}" for n in sizes if separates(n))
+          + " — see Table III for the direction.)\n")
+
+    w("We report this as the paper's principal finding, and it is worth being direct "
+      "about what it means. The adaptive merge/split layer is the component this line of "
+      "work — including our own earlier version of it — treats as the novel "
+      "contribution. Measured against gossip that is free to cross region boundaries, it "
+      "appears to deliver a large improvement. Measured against a fixed grid that simply "
+      "keeps its gossip inside a cell, it delivers none. **The improvement is real; the "
+      "attribution was wrong.**\n")
+    w("The threshold sweep in Section VI-H supplies the mechanism rather than merely "
+      "restating the result: the best adaptive configuration is the one that changes the "
+      "partition least, and accuracy degrades monotonically as merging grows more "
+      "aggressive. There is no setting of the merge and split thresholds at which "
+      "adaptation beats leaving the grid alone — the optimum sits at the boundary of "
+      "doing nothing.\n")
+    w("This does not make region management useless in general, and we are careful not "
+      "to over-claim in the negative direction either. Our fixed grid is already well "
+      "matched to the service area: every cell lies comfortably inside radio range of "
+      "its own members, and vehicles are close to uniformly distributed. Adaptation has "
+      "little to repair under those conditions. A deployment whose cells are badly sized "
+      "relative to radio range, or whose density varies by orders of magnitude across "
+      "the map, is a different setting that this evaluation does not cover. What we can "
+      "say is that in the setting the protocol was designed and previously evaluated "
+      "for, the improvement belongs to confinement.\n"
+      )
 
     w("### C. The Error Floor of Unconfined Gossip\n")
     xr = {p: main_r[big][p]["cross_region_exchange_pct"] for p in ORDER}
@@ -292,8 +307,61 @@ def main():
       f"shallow in bytes: control traffic is a small fraction of a budget dominated by "
       f"the per-round push-sum payload.\n")
 
-    w("### E. Mobility\n")
-    w("**TABLE V. STATIC VS MOBILE (N = 500)**\n")
+    w("### E. Periodic Restart and the Drift Caused by Mobility\n")
+    restart = d["restart_sweep"]
+    w("Running push-sum on a moving fleet has a failure mode that a single "
+      "end-of-run number hides. Without periodic restart the estimate reaches a "
+      "minimum after a handful of rounds and then **degrades steadily**, because "
+      "re-initialization at region boundaries keeps injecting fresh weight-1 mass into "
+      "regions where push-sum has already concentrated mass on a few holders. The "
+      "region's weight fills up with unaveraged single readings and the estimate drifts "
+      "back toward exactly the raw measurement the protocol exists to improve on.\n")
+    never = restart.get("0")
+    if never:
+        for p in ("fixed_confined", "adaptive_gwg"):
+            nv = never[p]
+            w(f"- {NAMES[p]} without restart: best **{nv['best_macro_mape']:.2f}%** at "
+              f"round {nv['best_round']}, degrading to **{nv['macro_mape']:.2f}%** "
+              f"steady state — a factor of "
+              f"{nv['macro_mape']/max(nv['best_macro_mape'], 1e-9):.1f}.")
+        w("")
+    w("The remedy is standard for push-sum over time-varying data: restart the "
+      "accumulator periodically. The convergence curve sets the period — long enough to "
+      "average, short enough that drift cannot accumulate. We apply it identically to "
+      "every protocol, so it favours none of them.\n")
+    w("**TABLE V. PUSH-SUM RESTART INTERVAL (N = 500, steady-state macro MAPE %)**\n")
+    ivs = sorted(restart, key=lambda k: (int(k) == 0, int(k)))
+    w("| Restart interval | " + " | ".join(NAMES[p] for p in ORDER) + " |")
+    w("|---|" + "---|" * len(ORDER))
+    for i in ivs:
+        lab = "never" if int(i) == 0 else f"every {i} rounds"
+        w(f"| {lab} | " + " | ".join(f"{restart[i][p]['macro_mape']:.2f}" for p in ORDER) + " |")
+    w("")
+    best_iv = min((i for i in ivs if int(i) > 0),
+                  key=lambda i: restart[i]["adaptive_gwg"]["macro_mape"])
+    cfg_iv = str(cfg.get("restart_interval", 10))
+    w(f"Restarting every {best_iv} rounds is best for both confined protocols, cutting "
+      f"Adaptive-GWG from {restart['0']['adaptive_gwg']['macro_mape']:.2f}% to "
+      f"{restart[best_iv]['adaptive_gwg']['macro_mape']:.2f}%. Restarting too often "
+      f"leaves too few rounds to average; too rarely lets drift accumulate. The "
+      f"remaining experiments use every {cfg_iv} rounds"
+      + (f", which is within the confidence interval of the {best_iv}-round optimum "
+         f"({restart[cfg_iv]['adaptive_gwg']['macro_mape']:.2f}% vs "
+         f"{restart[best_iv]['adaptive_gwg']['macro_mape']:.2f}%) and was fixed before "
+         f"this sweep was run" if cfg_iv != best_iv else "") + ".\n")
+    w(f"The most informative column is the leftmost. Uniform Random Gossip and Fixed GWG "
+      f"barely move across the entire sweep "
+      f"({restart['0']['uniform']['macro_mape']:.1f}% → "
+      f"{restart[best_iv]['uniform']['macro_mape']:.1f}% and "
+      f"{restart['0']['fixed_gwg']['macro_mape']:.1f}% → "
+      f"{restart[best_iv]['fixed_gwg']['macro_mape']:.1f}%). Restart repairs staleness, "
+      f"and staleness was never their problem — they are converging accurately to the "
+      f"wrong quantity, and no scheduling change fixes a target error. This is the "
+      f"cleanest confirmation in the paper that the error floor of Section VI-C is "
+      f"structural rather than an artifact of how long we ran the protocol.\n")
+
+    w("### F. Mobility\n")
+    w("**TABLE VI. STATIC VS MOBILE (N = 500)**\n")
     w("| Protocol | Static macro MAPE % | Mobile macro MAPE % | Degradation |")
     w("|---|---|---|---|")
     for p in ORDER:
@@ -303,22 +371,34 @@ def main():
     w("")
     ast, amo = mob["static"]["adaptive_gwg"]["macro_mape"], mob["mobile"]["adaptive_gwg"]["macro_mape"]
     cst, cmo = mob["static"]["fixed_confined"]["macro_mape"], mob["mobile"]["fixed_confined"]["macro_mape"]
-    w(f"Mobility is the dominant cost in this system. On a static network Adaptive-GWG "
-      f"reaches {ast:.2f}% macro MAPE; with vehicles in motion the same protocol reaches "
-      f"{amo:.2f}%. The cause is the re-initialization rule of Section IV-A: every "
-      f"boundary crossing discards the averaging work a vehicle has accumulated. At "
-      f"these speeds a vehicle crosses a {cfg['region_size_m']:.0f} m cell every few "
-      f"tens of rounds, so a substantial fraction of the fleet is restarting at any "
-      f"moment.\n")
-    w(f"The relative ordering is preserved — Adaptive-GWG stays ahead of the confined "
-      f"baseline mobile ({amo:.2f}% vs {cmo:.2f}%) as it does static "
-      f"({ast:.2f}% vs {cst:.2f}%) — so the mechanism's benefit is not an artifact of a "
-      f"static topology. But the absolute degradation is large enough that we regard "
-      f"re-initialization, not peer selection, as the most promising target for future "
-      f"work.\n")
+    worst_deg = max((mob["mobile"][p]["macro_mape"] - mob["static"][p]["macro_mape"])
+                    / mob["static"][p]["macro_mape"] * 100 for p in ORDER)
+    w(f"With periodic restart in place, mobility costs between "
+      f"{min((mob['mobile'][p]['macro_mape'] - mob['static'][p]['macro_mape']) / mob['static'][p]['macro_mape'] * 100 for p in ORDER):.0f}% "
+      f"and {worst_deg:.0f}% additional error. That is a far smaller penalty than the "
+      f"same comparison shows without restart, which is the point of Section VI-E: most "
+      f"of what looks like a mobility penalty is really accumulated drift that restart "
+      f"already removes.\n")
+    w(f"The two confined protocols absorb the larger relative hit "
+      f"({cst:.2f}% → {cmo:.2f}% and {ast:.2f}% → {amo:.2f}%) precisely because they "
+      f"have the most to lose: they are the only ones estimating the right quantity in "
+      f"the first place, so discarding accumulated averaging at a boundary crossing "
+      f"actually costs them something. The unconfined baselines barely move, for the "
+      f"same unflattering reason they are insensitive to everything else in this "
+      f"paper.\n")
+    if amo <= cmo:
+        w(f"Adaptive-GWG remains ahead of the confined baseline under mobility "
+          f"({amo:.2f}% vs {cmo:.2f}%).\n")
+    else:
+        w(f"We note that Adaptive-GWG is **behind** the confined baseline in both "
+          f"conditions here ({ast:.2f}% vs {cst:.2f}% static, {amo:.2f}% vs {cmo:.2f}% "
+          f"mobile), consistent with Section VI-B: adaptive region boundaries move as "
+          f"density fluctuates, and each move forces a re-initialization that a fixed "
+          f"grid does not pay. Under mobility, a stable partition is worth more than a "
+          f"well-fitted one.\n")
 
-    w("### F. Churn\n")
-    w("**TABLE VI. PER-ROUND CHURN (N = 500)**\n")
+    w("### G. Churn\n")
+    w("**TABLE VII. PER-ROUND CHURN (N = 500)**\n")
     w("| Churn ρ | " + " | ".join(NAMES[p] for p in ORDER) + " |")
     w("|---|" + "---|" * len(ORDER))
     for r in sorted(churn):
@@ -359,8 +439,8 @@ def main():
       f"and Uniform Random Gossip worst ({min(churn[r]['uniform']['macro_mape'] for r in rates):.2f}%–{u0:.2f}%), "
       f"so no conclusion in Section VI-B depends on the churn setting.\n")
 
-    w("### G. Sensitivity to the Adaptive Thresholds\n")
-    w("**TABLE VII. MERGE/SPLIT THRESHOLD SWEEP (N = 500)**\n")
+    w("### H. Sensitivity to the Adaptive Thresholds\n")
+    w("**TABLE VIII. MERGE/SPLIT THRESHOLD SWEEP (N = 500)**\n")
     w("| n_min | n_max | Macro MAPE % | Mean active regions |")
     w("|---|---|---|---|")
     best = min(sens.values(), key=lambda v: v["macro_mape"])
@@ -425,12 +505,12 @@ def main():
           f"({best['active_regions']:.0f} regions) and repairs only those cells too "
           f"sparse to gossip within.\n")
 
-    w("### H. Real-Time Readiness for AV Consumers\n")
+    w("### I. Real-Time Readiness for AV Consumers\n")
     w(f"Treating one round as one {cfg['round_duration_s']*1000:.0f} ms beacon interval "
       f"[23], [24], Table VIII reports the error a protocol would hand a decision system "
       f"at a given deadline. 'Usable' is macro MAPE ≤ 10%, an illustrative threshold for "
       f"cooperative speed advisory rather than one derived from a standard.\n")
-    w("**TABLE VIII. ERROR AT A DECISION DEADLINE (macro MAPE %)**\n")
+    w("**TABLE IX. ERROR AT A DECISION DEADLINE (macro MAPE %)**\n")
     budgets = sorted(int(b) for b in next(iter(av[big].values())))
     w("| N | Protocol | " + " | ".join(f"{b/1000:.1f} s" for b in budgets) + " |")
     w("|---|---|" + "---|" * len(budgets))
@@ -473,7 +553,7 @@ def main():
       "speed, not a road network. Real vehicles are constrained to streets, turn at "
       "intersections, and cluster at signals, which would make region membership more "
       "persistent than in our model and probably reduce the re-initialization cost that "
-      "Section VI-E identifies as dominant. A road-constrained mobility trace is the "
+      "Section VI-F identifies as dominant. A road-constrained mobility trace is the "
       "single most valuable improvement to this evaluation.\n")
     w(f"**Scale.** We test up to N = {big} vehicles in a "
       f"{cfg['grid_size']*cfg['region_size_m']:.0f} m square. This is a dense downtown "

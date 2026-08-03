@@ -25,21 +25,30 @@ static sensor field and likewise computes a single global average; and VANET clu
 produces mobility-aware groups but is evaluated on how long a cluster survives, not on
 whether anything computed inside it is accurate.
 
-This paper presents Adaptive Region-Aware Geo-Weighted Push-Sum Gossip
-(Adaptive-GWG), a leaderless protocol that combines inverse-distance-weighted peer
-selection, directional push-sum aggregation, and a region layer that merges sparse
-regions and splits dense ones as vehicle density changes, with no vehicle ever acting as
-a coordinator. Our central methodological contribution is an ablation that prior work in
-this space does not report: we separate *confining gossip to a region* from *adapting
-the region to density*, because the two are easily conflated and only the second is
-novel. Evaluating on 12.87 million real speed samples from the NYC TLC Yellow Taxi
-record with vehicles in continuous motion, we find that most of the accuracy improvement
-usually attributed to adaptive regions is in fact delivered by region confinement alone —
-a one-line change to the fixed-grid baseline — and that adaptive region management pays
-for itself specifically in the sparse-density regime, where fixed cells hold too few
-vehicles to form a viable gossip neighbourhood. We report the regime boundary rather
-than a single headline ratio, quantify the control-traffic cost of adaptation, and show
-that unconfined gossip has an irreducible error floor that no additional rounds remove.
+This paper studies Adaptive Region-Aware Geo-Weighted Push-Sum Gossip (Adaptive-GWG), a
+leaderless protocol combining inverse-distance-weighted peer selection, directional
+push-sum aggregation, and a region layer that merges sparse regions and splits dense ones
+as vehicle density changes, with no vehicle acting as a coordinator. Our central
+contribution is an ablation that this line of work — including our own earlier version of
+it — does not report: we separate *confining gossip to a region* from *adapting the
+region to density*, because the two are routinely bundled and only the second is claimed
+as novel.
+
+Evaluating on 12.87 million real speed samples from the NYC TLC Yellow Taxi record with
+vehicles in continuous motion, we find that **region confinement accounts for the entire
+improvement**. Restricting peer selection to the sender's own grid cell — a one-line
+change to the fixed-grid baseline — reduces per-region error by 48–57% at realistic
+densities. Adding density-driven region adaptation on top of that delivers no measurable
+further benefit (−0.1% to −3.3%, with overlapping confidence intervals at every fleet
+size) while adding control traffic; the best-performing threshold setting is the one that
+changes the partition least. We further show that geographic weighting alone buys
+locality of *communication* but not of *estimation*: it cuts mean hop distance by 84%
+while leaving 68.9% of exchanges crossing region boundaries and accuracy nearly
+unchanged. Finally, we identify a drift failure mode specific to running push-sum on a
+mobile fleet, in which re-initialization at region boundaries progressively refills a
+region with unaveraged readings and degrades error roughly fourfold from its minimum, and
+show that periodic restart bounds it — while leaving unconfined gossip untouched,
+confirming that its error floor is structural rather than a matter of scheduling.
 
 **Index Terms** — gossip protocols, distributed averaging, push-sum, geographic gossip,
 consensus, VANET, adaptive clustering, autonomous vehicles, cooperative perception,
@@ -84,25 +93,36 @@ moving between regions.
    small change to the protocol with a large effect, and it is the correct baseline
    against which any region-management scheme must be judged.
 
-2. **An adaptive region layer, and an honest account of when it helps.** Regions merge
-   when sparse and split when dense, with no leader and no election. We report an
-   ablation isolating this mechanism from region confinement, and find that its benefit
-   is *regime-dependent*: decisive where fixed cells are too sparsely populated to
-   gossip within, and marginal-to-negative where they are not. We characterize the
-   boundary rather than reporting a single ratio.
+2. **A negative result on adaptive region management, from a controlled ablation.**
+   Regions merge when sparse and split when dense, with no leader and no election.
+   Isolated against a region-confined fixed grid, this mechanism delivers no measurable
+   accuracy benefit at any fleet size we tested, while adding control traffic. The
+   threshold sweep supplies the mechanism rather than merely the result: the optimum lies
+   at the boundary of doing nothing, and accuracy degrades monotonically as merging grows
+   more aggressive. We state the scope of this negative result carefully in Section VI-B —
+   it holds for a grid already well matched to radio range and a roughly uniform vehicle
+   distribution, which is the setting the protocol was designed and previously evaluated
+   for.
 
-3. **Evaluation under mobility and churn, with the cost of adaptation charged to the
+3. **A drift failure mode for push-sum on a mobile fleet, and its remedy.**
+   Re-initialization at region boundaries injects unaveraged weight-1 mass into regions
+   where push-sum has concentrated mass, so error reaches a minimum after a few rounds
+   and then degrades roughly fourfold. Periodic restart bounds it. Diagnostically, the
+   remedy does nothing at all for unconfined gossip, which is the cleanest evidence we
+   have that its error floor is a wrong-target problem rather than a convergence-rate one.
+
+4. **Evaluation under mobility and churn, with the cost of adaptation charged to the
    protocol.** Vehicles move every round, cross region boundaries, and join and leave.
    Region-change announcements are counted against Adaptive-GWG's own bandwidth budget,
    so the accuracy/overhead trade-off is visible rather than assumed away.
 
-4. **A reproducible artifact.** Every figure and table is regenerated by one command
+5. **A reproducible artifact.** Every figure and table is regenerated by one command
    from real NYC TLC data; a test suite pins the protocol properties the analysis
    depends on (mass conservation, directional push-sum, merge correctness, metric
    validity); and the evaluation partition is protocol-independent, so no protocol can
    improve its own score by redefining what a region is.
 
-Contribution 4 is not decoration. In the course of this work we audited an earlier
+Contribution 5 is not decoration. In the course of this work we audited an earlier
 version of our own harness and found that its headline result did not survive: the
 reported gains were attributable to region confinement rather than to adaptation, one
 fleet size showed a large "win" from an adaptive rule that had relabelled zero vehicles,
@@ -388,6 +408,23 @@ sacrifices strict global mass conservation in exchange for correct regional attr
 and it is the dominant cost of mobility in our results: every boundary crossing discards
 accumulated averaging work. All protocols compared here pay this cost under the same rule.
 
+**Periodic restart.** Re-initialization interacts badly with push-sum's tendency to
+concentrate mass on a few holders. A vehicle that resets injects fresh weight-1 mass into
+a region whose accumulated weight sits elsewhere; as crossings accumulate, the region's
+weight fills up with unaveraged single readings and the estimate drifts back toward
+precisely the raw measurement the protocol exists to improve on. Measured over 150 rounds
+this is not a subtle effect — the error reaches a minimum after a handful of rounds and
+then degrades several-fold (Section VI-E).
+
+Every vehicle therefore restarts its accumulator on a fixed schedule, every τ_r rounds,
+which bounds how much drift can accumulate. Restart is local and requires no coordination:
+the schedule is a constant, not a negotiated epoch, so it introduces no leader and no
+synchronization messages. Periodic restart is the standard remedy for running push-sum on
+time-varying input, and we apply it identically to all four protocols so that it cannot
+favour ours. Section VI-E reports the sweep that sets τ_r, and — more usefully — shows
+that restart does nothing for the unconfined baselines, because staleness was never what
+was wrong with them.
+
 ### B. Geo-Weighted Peer Selection
 
 Vehicle *i* selects peer *j* from its candidate set 𝒞ᵢ(t) with probability
@@ -480,37 +517,53 @@ does not support.
 ## VIII. Conclusion
 
 We set out to give a vehicle fleet a live, per-region estimate of traffic speed with no
-central server and no cluster head, and to establish how much of the resulting
-improvement is attributable to each mechanism rather than to the combination.
+central server and no cluster head, and — the part that turned out to matter — to
+establish how much of the resulting improvement is attributable to each mechanism rather
+than to the combination.
 
-The clearest finding is negative in form and useful in substance. Geographic weighting on
-its own — the mechanism most closely associated with geographic gossip — substantially
-shortens the distance each message travels but does *not* produce regional estimates,
-because weighted selection still crosses region boundaries and mass still flows toward
-the city-wide mean. Confining exchanges to a region is what converts a global averaging
-protocol into a regional one, and it is a small change to a fixed-grid baseline. Any
-future proposal in this area should report it as a baseline, because a comparison against
-unconfined gossip will otherwise credit region management with an improvement that
-confinement alone delivers.
+The answer is that **region confinement does the work**. Restricting gossip to the
+sender's own cell reduces per-region error by 48–57% at realistic densities. Adding
+density-driven region adaptation on top of that contributes nothing measurable: the gains
+are −0.1% to −3.3%, the confidence intervals overlap at every fleet size, and the best
+threshold configuration is the one that leaves the partition closest to untouched. The
+improvement previously reported for adaptive regions — including in our own earlier
+version of this work — is real, but it belongs to confinement, and it appeared to belong
+to adaptation only because the comparison was against gossip free to cross region
+boundaries.
 
-Against that stronger baseline, adaptive region management earns its cost in a specific
-and identifiable regime: where fixed cells hold too few vehicles to form a viable gossip
-neighbourhood, merging is what makes regional averaging possible at all, and the benefit
-is large. Where cells are already well populated, adaptation adds control traffic and
-re-initialization churn without a commensurate accuracy return. We regard the regime
-boundary as the more useful contribution: it tells a deployment when to switch the
-mechanism on, which a single averaged improvement figure would have obscured.
+A second finding is worth as much as the first, and it is easy to miss without the
+ablation. Geographic weighting cuts the distance a message travels by 84% and barely
+improves accuracy at all. It buys locality of *communication*, not locality of
+*estimation*. This is genuinely counter-intuitive — a protocol that talks only to nearby
+vehicles feels as though it should produce a local answer — but the exchange graph stays
+connected across the whole service area, and push-sum mass flows along it however short
+each individual hop is. 68.9% of Fixed GWG's exchanges cross a region boundary, and no
+number of additional rounds repairs a wrong target. Periodic restart demonstrates the same
+point from the other side: it improves the confined protocols roughly fourfold and leaves
+the unconfined ones essentially unchanged, because staleness was never what was wrong
+with them.
 
-Three directions follow. First, the merge and split thresholds are currently static and
-could be driven by observed estimate variance rather than by vehicle count, letting a
-region adapt to the heterogeneity of what it is measuring rather than to how many
-vehicles happen to be in it. Second, the re-initialization rule discards accumulated
-averaging work on every boundary crossing and is the dominant cost of mobility in our
-results; a scheme that transfers partial mass between regions in proportion to residence
-time would recover some of it. Third, pairing Adaptive-GWG with a VANET neighbour-discovery
-layer such as GSIM-ND [8] would close the loop between finding a partner and deciding what
-to compute with one — the two problems sit at adjacent layers and have so far been studied
-separately.
+We want to be careful about the scope of the negative result. Our grid is already well
+matched to radio range, every cell lies inside its own members' communication radius, and
+vehicles are close to uniformly distributed — conditions under which adaptation has
+little to repair. A deployment with badly sized cells, or density varying by orders of
+magnitude across the map, is a different setting that this evaluation does not cover. The
+defensible claim is narrower and, we think, more useful: in the setting this protocol was
+designed and previously evaluated for, adaptive region management is not what makes it
+work, and any future proposal in this space should report a region-confined fixed grid as
+a baseline before claiming otherwise.
+
+Three directions follow. First, the merge and split thresholds are driven by vehicle
+count; driving them instead by observed estimate variance would let a region adapt to the
+heterogeneity of what it is measuring rather than to how many vehicles happen to be
+inside it, which is the version of adaptation our results do not rule out. Second,
+re-initialization discards accumulated averaging on every boundary crossing and is the
+mechanism behind both the mobility penalty and the drift failure mode; transferring
+partial mass between regions in proportion to residence time, or expiring mass on an age
+bound rather than only at a boundary, would address both at once. Third, pairing this
+work with a VANET neighbour-discovery layer such as GSIM-ND [8] would close the loop
+between finding a partner and deciding what to compute with one — adjacent layers that
+have so far been studied separately.
 
 ---
 

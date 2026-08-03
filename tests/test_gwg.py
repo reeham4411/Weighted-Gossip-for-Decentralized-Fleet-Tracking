@@ -323,13 +323,19 @@ def test_non_converging_runs_are_not_averaged_in():
     """
     runs = [
         {"converged": True, "convergence_round": 10, "final_micro_mape": 1.0,
-         "final_macro_mape": 1.0, "avg_hop_m": 40.0, "total_bytes_per_node": 100.0,
+         "final_macro_mape": 1.0, "steady_macro_mape": 1.0, "steady_micro_mape": 1.0,
+         "best_macro_mape": 1.0, "best_macro_round": 1,
+         "avg_hop_m": 40.0, "total_bytes_per_node": 100.0,
          "micro_curve": [1.0], "macro_curve": [1.0], "data_messages": 1,
-         "control_messages": 0, "avg_active_regions": 10.0},
+         "control_messages": 0, "avg_active_regions": 10.0,
+         "cross_region_exchange_pct": 0.0},
         {"converged": False, "convergence_round": None, "final_micro_mape": 30.0,
-         "final_macro_mape": 30.0, "avg_hop_m": 40.0, "total_bytes_per_node": 100.0,
+         "final_macro_mape": 30.0, "steady_macro_mape": 30.0, "steady_micro_mape": 30.0,
+         "best_macro_mape": 30.0, "best_macro_round": 1,
+         "avg_hop_m": 40.0, "total_bytes_per_node": 100.0,
          "micro_curve": [30.0], "macro_curve": [30.0], "data_messages": 1,
-         "control_messages": 0, "avg_active_regions": 10.0},
+         "control_messages": 0, "avg_active_regions": 10.0,
+         "cross_region_exchange_pct": 0.0},
     ]
     s = G.summarize(runs)
     assert s["n_converged"] == 1 and s["trials"] == 2
@@ -358,7 +364,7 @@ def test_runs_are_reproducible():
     pool = _pool()
     a = G.run_once("adaptive_gwg", 200, pool, seed=99, max_rounds=15)
     b = G.run_once("adaptive_gwg", 200, pool, seed=99, max_rounds=15)
-    assert a["final_macro_mape"] == b["final_macro_mape"]
+    assert a["steady_macro_mape"] == b["steady_macro_mape"]
     assert a["avg_hop_m"] == b["avg_hop_m"]
 
 
@@ -368,7 +374,7 @@ def test_different_seeds_give_different_fleets():
     pool = _pool()
     a = G.run_once("fixed_gwg", 200, pool, seed=1, max_rounds=15)
     b = G.run_once("fixed_gwg", 200, pool, seed=2, max_rounds=15)
-    assert a["final_macro_mape"] != b["final_macro_mape"]
+    assert a["steady_macro_mape"] != b["steady_macro_mape"]
 
 
 def test_geo_weighting_shortens_hops():

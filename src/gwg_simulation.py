@@ -146,6 +146,21 @@ ADAPTIVE_MAX_REGION_NODES = 20
 # saves.
 ADAPTIVE_REFRESH_ROUNDS = 1
 
+# Periodic restart of the push-sum accumulator, in rounds (0 disables).
+#
+# Push-sum assumes a fixed population and a static input. Neither holds here:
+# vehicles cross region boundaries and re-initialise, which injects fresh
+# weight-1 mass into a region where push-sum has already concentrated mass on a
+# few holders. That inflates the region's weight with unaveraged readings, and
+# the estimate drifts back toward a raw single reading. Measured over 150 rounds
+# the error reaches a minimum near round 9 and then degrades by roughly 5x.
+#
+# Restarting the accumulator periodically is the standard remedy for running
+# push-sum on time-varying data, and the convergence curve sets the period: long
+# enough to average, short enough that drift cannot accumulate. It is applied
+# identically to every protocol, so it does not favour any of them.
+RESTART_INTERVAL = 10
+
 # AV real-time readiness.
 AV_LATENCY_BUDGETS_MS = [500, 1000, 2000, 5000]
 AV_USABLE_MAPE_PCT = 10.0
@@ -653,7 +668,7 @@ def error_metrics(estimates, true_speed, partition):
 def run_once(protocol, n, speed_pool, seed,
              max_rounds=MAX_ROUNDS, churn_rate=CHURN_RATE,
              mobility=None, min_nodes=None, max_nodes=None,
-             refresh_rounds=None):
+             refresh_rounds=None, restart_interval=None):
     """
     Run one protocol on one independently generated fleet.
 
@@ -665,6 +680,7 @@ def run_once(protocol, n, speed_pool, seed,
     is reported alongside the main result.
     """
     refresh_rounds = ADAPTIVE_REFRESH_ROUNDS if refresh_rounds is None else refresh_rounds
+    restart_interval = RESTART_INTERVAL if restart_interval is None else restart_interval
     global MOBILITY_ENABLED
     prev_mobility = MOBILITY_ENABLED
     if mobility is not None:
@@ -693,6 +709,9 @@ def run_once(protocol, n, speed_pool, seed,
         cross_region_exchanges = 0
 
         for rnd in range(1, max_rounds + 1):
+            # Periodic restart, applied identically to every protocol.
+            if restart_interval and rnd > 1 and rnd % restart_interval == 1:
+                fleet.reset_estimates()
             fleet.step_mobility()
             fleet.step_churn(churn_rate)
             fleet.refresh_true_speed()
@@ -758,6 +777,17 @@ def run_once(protocol, n, speed_pool, seed,
             "convergence_round": convergence_round,
             "final_micro_mape": micro_curve[-1],
             "final_macro_mape": macro_curve[-1],
+            # Headline metric: error averaged over the second half of the run.
+            # A single final-round reading is phase-sensitive once the
+            # accumulator restarts periodically -- restart intervals of 10 and
+            # 20 rounds happen to share their last restart before round 150 and
+            # so report identical final-round error while behaving differently
+            # throughout. Averaging over the steady-state half removes that
+            # artefact and is what a deployment actually experiences.
+            "steady_macro_mape": float(np.mean(macro_curve[len(macro_curve) // 2:])),
+            "steady_micro_mape": float(np.mean(micro_curve[len(micro_curve) // 2:])),
+            "best_macro_mape": float(np.min(macro_curve)),
+            "best_macro_round": int(np.argmin(macro_curve) + 1),
             "micro_curve": micro_curve,
             "macro_curve": macro_curve,
             "avg_hop_m": fleet.total_hop_distance / max(fleet.exchanges, 1),
@@ -801,8 +831,10 @@ def mean_ci95(values):
 def summarize(runs):
     """Aggregate the per-trial runs for one (protocol, N) cell of the table."""
     conv = [r["convergence_round"] for r in runs if r["converged"]]
-    micro = [r["final_micro_mape"] for r in runs]
-    macro = [r["final_macro_mape"] for r in runs]
+    micro = [r["steady_micro_mape"] for r in runs]
+    macro = [r["steady_macro_mape"] for r in runs]
+    final_macro = [r["final_macro_mape"] for r in runs]
+    best_macro = [r["best_macro_mape"] for r in runs]
     hop = [r["avg_hop_m"] for r in runs]
     byte = [r["total_bytes_per_node"] for r in runs]
 
@@ -824,6 +856,9 @@ def summarize(runs):
         "median_convergence_round": float(np.median(conv)) if conv else None,
         "micro_mape": micro_m, "micro_mape_ci95": micro_ci,
         "macro_mape": macro_m, "macro_mape_ci95": macro_ci,
+        "final_macro_mape": float(np.mean(final_macro)),
+        "best_macro_mape": float(np.mean(best_macro)),
+        "best_macro_round": float(np.mean([r["best_macro_round"] for r in runs])),
         "avg_hop_m": hop_m, "avg_hop_m_ci95": hop_ci,
         "bytes_per_node": byte_m, "bytes_per_node_ci95": byte_ci,
         "data_messages": float(np.mean([r["data_messages"] for r in runs])),
@@ -842,7 +877,8 @@ def summarize(runs):
 # ---------------------------------------------------------------------------
 
 def run_main_experiment(speed_pool, trials=TRIALS, node_counts=None,
-                        churn_rate=CHURN_RATE, mobility=True, tag="main"):
+                        churn_rate=CHURN_RATE, mobility=True, tag="main",
+                        restart_interval=None):
     node_counts = node_counts or NODE_COUNTS
     out = {}
     for n in node_counts:
@@ -854,7 +890,8 @@ def run_main_experiment(speed_pool, trials=TRIALS, node_counts=None,
                 # comparison), different across trials (independent replicates).
                 runs.append(run_once(proto, n, speed_pool,
                                      seed=RANDOM_SEED + 1000 * t,
-                                     churn_rate=churn_rate, mobility=mobility))
+                                     churn_rate=churn_rate, mobility=mobility,
+                                     restart_interval=restart_interval))
             out[n][proto] = summarize(runs)
             s = out[n][proto]
             conv = (f"{s['median_convergence_round']:.0f}"
@@ -951,6 +988,41 @@ def run_refresh_sweep(speed_pool, n=500, rates=(1, 2, 5, 10, 25), trials=5):
     return out
 
 
+def run_restart_sweep(speed_pool, n=500, intervals=(0, 5, 10, 20, 50), trials=5):
+    """
+    Sweep the push-sum restart period, including 0 (never restart).
+
+    Applied identically to every protocol. Without restart the estimate reaches
+    a minimum after a few rounds and then degrades, because re-initialisation at
+    region boundaries keeps injecting unaveraged weight-1 mass into regions where
+    push-sum has already concentrated mass. Reporting only the final round would
+    describe that degraded state; reporting only the minimum would flatter every
+    protocol with a number it cannot hold. The sweep shows what a deployment can
+    actually sustain.
+    """
+    print("\n>>> Push-sum restart-interval sweep (N=%d)" % n, flush=True)
+    out = {}
+    for iv in intervals:
+        out[str(iv)] = {}
+        for proto in PROTOCOLS:
+            runs = [run_once(proto, n, speed_pool, seed=RANDOM_SEED + 1000 * t,
+                             churn_rate=0.0, mobility=True, restart_interval=iv)
+                    for t in range(trials)]
+            s = summarize(runs)
+            curve = np.array(s["macro_curve"])
+            out[str(iv)][proto] = {
+                "macro_mape": s["macro_mape"],
+                "macro_mape_ci95": s["macro_mape_ci95"],
+                "best_macro_mape": float(curve.min()),
+                "best_round": int(curve.argmin() + 1),
+            }
+        label = "never" if not iv else f"every {iv}"
+        print(f"  restart {label:>9}  " + "  ".join(
+            f"{PROTOCOL_SHORT[p]}={out[str(iv)][p]['macro_mape']:.2f}%" for p in PROTOCOLS
+        ), flush=True)
+    return out
+
+
 def compute_av_readiness(main):
     """
     Reframe the convergence curves against a V2X latency budget: at 100 ms per
@@ -978,8 +1050,9 @@ def compute_av_readiness(main):
 
 def print_main_table(main):
     print("\n" + "=" * 122)
-    print("MAIN RESULTS  (mobility on, no churn, 95% CI over independent trials)")
+    print("MAIN RESULTS  (mobility on, no churn, restart every %d rounds, 95%% CI)" % RESTART_INTERVAL)
     print("=" * 122)
+    print("macro/micro MAPE = mean over the steady-state half of the run.")
     print("x-region % = share of exchanges that moved mass across a region boundary.")
     print(f"{'N':>5} | {'Protocol':>27} | {'macro MAPE %':>16} | {'micro MAPE %':>16} | "
           f"{'conv (med)':>11} | {'hop m':>7} | {'B/node':>8} | {'x-region %':>10}")
@@ -1086,7 +1159,7 @@ def _bars(ax, node_counts, values, errs=None):
     _style(ax)
 
 
-def make_figures(main, churn, mobility, sensitivity, av, out_dir=OUT_DIR):
+def make_figures(main, churn, mobility, sensitivity, av, restart, out_dir=OUT_DIR):
     if plt is None:
         print(f"\nFigures skipped, matplotlib unavailable: {MATPLOTLIB_IMPORT_ERROR}")
         return []
@@ -1232,6 +1305,25 @@ def make_figures(main, churn, mobility, sensitivity, av, out_dir=OUT_DIR):
     fig.suptitle("Error available within a V2X decision deadline", fontweight="bold", y=1.02)
     save(fig, "fig8_av_readiness.png")
 
+    # Fig 10 -- restart interval.
+    fig, ax = plt.subplots(figsize=(7.2, 3.6))
+    ivs = sorted(restart, key=lambda k: (int(k) == 0, int(k)))
+    xs = list(range(len(ivs)))
+    for proto in PROTOCOLS:
+        ax.plot(xs, [restart[i][proto]["macro_mape"] for i in ivs],
+                marker=PROTOCOL_MARKERS[proto], ms=6, lw=2,
+                color=PROTOCOL_COLORS[proto], linestyle=PROTOCOL_LINESTYLES[proto],
+                label=PROTOCOL_LABELS[proto])
+    ax.set_xticks(xs)
+    ax.set_xticklabels(["never" if int(i) == 0 else i for i in ivs])
+    ax.set_xlabel("Push-sum restart interval (rounds)")
+    ax.set_ylabel("Steady-state per-region MAPE  %")
+    ax.set_title("Periodic restart bounds the drift caused by mobility (N = 500)",
+                 fontweight="bold")
+    ax.legend(frameon=False, fontsize=8)
+    _style(ax)
+    save(fig, "fig10_restart_interval.png")
+
     # Fig 9 -- mobility on/off.
     fig, ax = plt.subplots(figsize=(6.0, 3.6))
     x = np.arange(2)
@@ -1285,6 +1377,7 @@ def main():
     mobility_results = run_mobility_sweep(pool)
     sensitivity_results = run_threshold_sensitivity(pool)
     refresh_results = run_refresh_sweep(pool)
+    restart_results = run_restart_sweep(pool)
     av = compute_av_readiness(main_results)
 
     print_main_table(main_results)
@@ -1293,7 +1386,8 @@ def main():
     print_amdahl_analysis()
 
     print("\n>>> Figures", flush=True)
-    make_figures(main_results, churn_results, mobility_results, sensitivity_results, av)
+    make_figures(main_results, churn_results, mobility_results, sensitivity_results,
+                 av, restart_results)
 
     os.makedirs(RESULTS_DIR, exist_ok=True)
     payload = {
@@ -1304,6 +1398,7 @@ def main():
             "adaptive_min": ADAPTIVE_MIN_REGION_NODES,
             "adaptive_max": ADAPTIVE_MAX_REGION_NODES,
             "adaptive_refresh_rounds": ADAPTIVE_REFRESH_ROUNDS,
+            "restart_interval": RESTART_INTERVAL,
             "msg_size_bytes": MSG_SIZE_BYTES, "control_msg_bytes": CONTROL_MSG_BYTES,
             "dataset_samples": int(len(speeds)),
             "dataset_mean_mph": float(speeds.mean()),
@@ -1314,6 +1409,7 @@ def main():
         "mobility": mobility_results,
         "threshold_sensitivity": sensitivity_results,
         "refresh_sweep": refresh_results,
+        "restart_sweep": restart_results,
         "av_readiness": {str(k): {p: {str(b): d for b, d in row.items()}
                                   for p, row in v.items()} for k, v in av.items()},
     }
