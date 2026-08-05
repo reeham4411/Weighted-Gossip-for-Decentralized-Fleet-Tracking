@@ -22,23 +22,30 @@ a one-line change to the baseline — already delivers.
 
 ## What we actually found
 
-Two mechanisms are usually bundled together under "adaptive geo-weighted gossip",
-and they have **opposite density dependence**:
+Two mechanisms are usually bundled together under "adaptive geo-weighted gossip".
+Only one of them is doing anything:
 
-- **Region confinement** is useless-to-harmful when cells are sparse and
-  increasingly valuable as they fill (−16% at 1 vehicle/cell, +28% at 10).
-- **Adaptive region management** runs the other way: worth ~38% at 1 vehicle/cell,
-  and statistically indistinguishable from the confined baseline at 10.
+- **Region confinement accounts for the entire improvement.** Restricting peer
+  selection to the sender's own grid cell — a one-line change to the fixed-grid
+  baseline — reduces per-region error by +9.9% at N=100 (~1 vehicle/cell), +57.4%
+  at N=500 (~5 vehicles/cell), and +48.1% at N=1000 (~10 vehicles/cell).
+- **Adaptive region management adds nothing measurable on top of it**, at any
+  fleet size tested (−0.1%, −3.3%, −0.2% respectively — confidence intervals
+  overlap throughout), while it alone carries control-message traffic the
+  confined baseline does not pay.
 
-So the practical guidance is a switch, not a blanket claim: enable the adaptive
-layer where cells are sparse relative to the merge threshold; disable it where
-they are not, since it costs control traffic and buys nothing.
+So the practical guidance is not a switch by density: in this setting — a fixed
+grid already well matched to radio range, with roughly uniform vehicle density —
+confine gossip to a region and stop there; the adaptive layer buys nothing here
+and costs traffic. Whether adaptation earns its keep in a badly-sized or
+wildly uneven-density deployment is outside what this evaluation covers.
 
 Separately, **geographic weighting buys locality of communication, not locality of
 estimation.** Fixed GWG cuts mean hop distance by ~84% versus uniform gossip but
-barely improves accuracy: its exchanges still cross region boundaries, the gossip
-graph still spans the service area, and push-sum still converges toward the
-city-wide mean. Confinement, not weighting, is what makes an estimate regional.
+barely improves accuracy: 68.9% of its exchanges still cross a region boundary at
+N=1000, the gossip graph still spans the service area, and push-sum still
+converges toward the city-wide mean. Confinement, not weighting, is what makes an
+estimate regional.
 
 Exact figures, confidence intervals and the claim-to-evidence map:
 [`paper/RESULTS.md`](paper/RESULTS.md) and [`paper/NUMBERS.md`](paper/NUMBERS.md),
