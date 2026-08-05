@@ -81,12 +81,13 @@ which is the setting this protocol was designed and previously evaluated for.
 - Superseded v1 docs banner-marked rather than deleted; their problem framing
   and mathematics remain useful
 
-## Needs a team decision
+## Title decision
 
-**The title.** It names the adaptive layer as the contribution and the evidence
-no longer supports that. Three options with a recommendation are at the top of
-`paper/adaptive_gwg_paper.md`. Submitting under the current title would promise
-a result the paper then retracts.
+The paper previously ran under a title naming the adaptive layer as the
+contribution, which the evidence no longer supports. The team has settled on
+*What Actually Makes Geo-Weighted Gossip Regional: An Ablation of Region-Aware
+Push-Sum for Vehicular Networks*, which matches Section VI-B's finding instead
+of the claim it retracts.
 
 ## Verification
 

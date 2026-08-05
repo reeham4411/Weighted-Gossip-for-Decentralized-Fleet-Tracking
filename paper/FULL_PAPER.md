@@ -1,4 +1,4 @@
-# Adaptive Region-Aware Geo-Weighted Push-Sum Gossip for Highly Mobile Vehicular Networks
+# What Actually Makes Geo-Weighted Gossip Regional: An Ablation of Region-Aware Push-Sum for Vehicular Networks
 
 **Fatima Ali**, **Asma Imran**, **Adeena Reeham**
 School of Electrical Engineering and Computer Science

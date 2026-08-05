@@ -2,8 +2,8 @@
 Adaptive Region-Aware Geo-Weighted Push-Sum Gossip (Adaptive-GWG)
 =================================================================
 
-Evaluation harness for the paper "Adaptive Region-Aware Geo-Weighted Push-Sum
-Gossip for Highly Mobile Vehicular Networks".
+Evaluation harness for the paper "What Actually Makes Geo-Weighted Gossip
+Regional: An Ablation of Region-Aware Push-Sum for Vehicular Networks".
 
 Team: Fatima Ali (470708), Asma Imran (481920), Adeena Reeham (480941)
 

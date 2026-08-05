@@ -1,4 +1,4 @@
-# Adaptive Region-Aware Geo-Weighted Push-Sum Gossip for Highly Mobile Vehicular Networks
+# What Actually Makes Geo-Weighted Gossip Regional: An Ablation of Region-Aware Push-Sum for Vehicular Networks
 
 **Fatima Ali**, **Asma Imran**, **Adeena Reeham**
 School of Electrical Engineering and Computer Science
@@ -10,21 +10,12 @@ National University of Sciences and Technology, Islamabad, Pakistan
 > is traceable to that file; none are transcribed by hand. See `paper/NUMBERS.md` for the
 > claim-to-evidence map.
 >
-> **The title needs a team decision.** The current title names the adaptive layer as the
-> contribution, and the evidence no longer supports that — Section VI-B finds the
-> improvement belongs to region confinement, with adaptation contributing nothing
-> measurable. Submitting under this title would promise a result the paper then retracts,
-> which reviewers read as overclaiming even when the body is honest. Three options, in
-> our order of preference:
->
-> 1. *What Actually Makes Geo-Weighted Gossip Regional: An Ablation of Region-Aware
->    Push-Sum for Vehicular Networks* — matches the finding, signals the ablation, and
->    frames the negative result as the contribution it is.
-> 2. *Region Confinement, Not Region Adaptation: Revisiting Geo-Weighted Push-Sum Gossip
->    for Vehicle Fleets* — sharper, states the result outright.
-> 3. Keep the current title and reframe the paper around the adaptive layer as the
->    *object of study* rather than the proposal. Weakest option: the title still reads
->    as a proposal.
+> **Title decided.** The paper previously ran under *Adaptive Region-Aware Geo-Weighted
+> Push-Sum Gossip for Highly Mobile Vehicular Networks*, which names the adaptive layer as
+> the contribution — a claim Section VI-B does not support, since the improvement belongs
+> to region confinement, with adaptation contributing nothing measurable. The team has
+> settled on the title above, which matches the finding and frames the ablation as the
+> contribution it is.
 >
 > Option 1 or 2 also makes the paper a better fit for a reproducibility or
 > measurement-focused venue, where a well-controlled negative result is the point rather
