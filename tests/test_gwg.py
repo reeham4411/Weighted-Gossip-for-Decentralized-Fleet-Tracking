@@ -402,6 +402,80 @@ def test_ci95_is_a_real_confidence_interval():
     assert G.mean_ci95([5.0])[1] == 0.0
 
 
+def test_paired_diff_ci95_uses_paired_variance_not_pooled_variance():
+    """
+    A paired test must cancel variance that is common to both samples (e.g. a
+    trial-to-trial fleet effect shared by every protocol run against that
+    trial's seed). Two samples that individually have large spread but move
+    together trial-by-trial must yield a *tight* interval on their difference
+    -- a much stronger statement than comparing their independent CIs, which
+    is the whole reason this helper exists instead of an overlap check.
+    """
+    a = [10.0, 20.0, 30.0, 40.0, 50.0]
+    b = [x + 2.0 for x in a]  # constant offset: perfectly paired, zero noise
+    result = G.paired_diff_ci95(a, b)
+    assert math.isclose(result["mean_diff"], -2.0)
+    assert result["ci95"] == 0.0
+    assert result["significant"] is True
+
+    result_no_diff = G.paired_diff_ci95(a, a)
+    assert result_no_diff["mean_diff"] == 0.0
+    assert result_no_diff["significant"] is False
+
+
+def test_summarize_keeps_index_aligned_per_trial_values():
+    """
+    per_trial_macro_mape must be one value per run, in run order, so it can be
+    paired index-for-index against another protocol's per_trial_macro_mape at
+    the same N (same seed per trial index -- see run_main_experiment). If this
+    ever stopped matching len(runs) or got reordered/aggregated, every paired
+    comparison built on it would silently pair the wrong trials together.
+    """
+    def fake_run(steady_macro_mape):
+        return {
+            "converged": False, "convergence_round": None,
+            "final_micro_mape": 1.0, "final_macro_mape": 1.0,
+            "steady_macro_mape": steady_macro_mape, "steady_micro_mape": 1.0,
+            "best_macro_mape": 1.0, "best_macro_round": 1,
+            "avg_hop_m": 40.0, "total_bytes_per_node": 100.0,
+            "micro_curve": [1.0], "macro_curve": [1.0], "data_messages": 1,
+            "control_messages": 0, "avg_active_regions": 10.0,
+            "cross_region_exchange_pct": 0.0,
+        }
+
+    runs = [fake_run(v) for v in (5.0, 7.0, 9.0)]
+    s = G.summarize(runs)
+    assert s["per_trial_macro_mape"] == [5.0, 7.0, 9.0]
+
+
+def test_ablation_significance_pairs_the_right_protocols():
+    """
+    compute_ablation_significance must compare fixed_gwg -> fixed_confined for
+    the confinement question and fixed_confined -> adaptive_gwg for the
+    adaptation question, trial-index-aligned, at every N present in its input
+    -- not, e.g., uniform vs. anything, and not the group means.
+    """
+    fake_main = {
+        100: {
+            "uniform": {"per_trial_macro_mape": [99.0, 99.0]},
+            "fixed_gwg": {"per_trial_macro_mape": [20.0, 22.0]},
+            "fixed_confined": {"per_trial_macro_mape": [10.0, 12.0]},
+            "adaptive_gwg": {"per_trial_macro_mape": [10.0, 12.0]},
+        },
+    }
+    out = G.compute_ablation_significance(fake_main)
+    assert set(out.keys()) == {100}
+    conf = out[100]["confinement"]
+    adapt = out[100]["adaptation"]
+    # fixed_gwg - fixed_confined = [10.0, 10.0] -> mean 10, zero spread
+    assert math.isclose(conf["mean_diff"], 10.0)
+    assert conf["ci95"] == 0.0
+    assert conf["significant"] is True
+    # fixed_confined - adaptive_gwg = [0.0, 0.0] -> identical, no effect
+    assert adapt["mean_diff"] == 0.0
+    assert adapt["significant"] is False
+
+
 def test_non_converging_runs_are_not_averaged_in():
     """
     v1 recorded a non-converging run as MAX_ROUNDS+1 and averaged it, producing

@@ -970,6 +970,34 @@ def mean_ci95(values):
     return m, t * sd / math.sqrt(n)
 
 
+def paired_diff_ci95(a_values, b_values):
+    """
+    Mean and 95% CI of the paired difference a - b (Student t on the per-trial
+    differences), plus whether that interval excludes zero.
+
+    Every experiment here pairs trials by construction (run_main_experiment
+    uses the same seed, and therefore the same fleet, for every protocol
+    within a trial index -- see its docstring). Comparing two protocols by
+    checking whether their independent per-protocol confidence intervals
+    overlap throws that pairing away and is a strictly more conservative,
+    lower-power test than analysing the paired differences directly: a paired
+    design cancels the trial-to-trial fleet variance common to both protocols,
+    which is exactly the variance an unpaired overlap check cannot remove.
+    Reporting only the overlap check would understate how confidently a null
+    result can be claimed here.
+    """
+    a = np.asarray(a_values, dtype=float)
+    b = np.asarray(b_values, dtype=float)
+    if a.size != b.size:
+        raise ValueError("paired comparison requires equal-length, index-aligned samples")
+    diff_m, diff_ci = mean_ci95(a - b)
+    return {
+        "mean_diff": diff_m,
+        "ci95": diff_ci,
+        "significant": bool(abs(diff_m) > diff_ci),
+    }
+
+
 def summarize(runs):
     """Aggregate the per-trial runs for one (protocol, N) cell of the table."""
     conv = [r["convergence_round"] for r in runs if r["converged"]]
@@ -1011,6 +1039,12 @@ def summarize(runs):
         "micro_curve": micro_curve,
         "macro_curve": macro_curve,
         "curve_len": curve_len,
+        # Raw per-trial values, index-aligned with every other protocol at the
+        # same N (same seed per trial index -- see run_main_experiment). Kept
+        # so a paired test (paired_diff_ci95) can be computed downstream
+        # instead of only comparing independent per-protocol intervals.
+        "per_trial_macro_mape": [float(x) for x in macro],
+        "per_trial_micro_mape": [float(x) for x in micro],
     }
 
 
@@ -1185,6 +1219,37 @@ def run_road_mobility_comparison(speed_pool, road_network,
                                road_network=road_network)
 
 
+def compute_ablation_significance(main):
+    """
+    Paired significance test for the two ablation questions Section VI-B and
+    VI-J answer, at every N present in `main`:
+
+      confinement: does confining Fixed GWG to the sender's cell change error?
+                   (fixed_gwg per-trial macro MAPE) - (fixed_confined ...)
+      adaptation:  does adding density-driven regions on top of confinement
+                   change error?
+                   (fixed_confined per-trial macro MAPE) - (adaptive_gwg ...)
+
+    Both are paired differences (positive = the second protocol is more
+    accurate), using paired_diff_ci95 rather than comparing the two
+    protocols' independent confidence intervals -- see that function's
+    docstring for why the paired version is the correct, higher-power test
+    here. Works for any main-shaped dict (the headline random-walk `main`
+    table or the road-constrained `road_mobility` table), since both are
+    produced by run_main_experiment with the same seed-per-trial pairing.
+    """
+    out = {}
+    for n, protos in main.items():
+        fg = protos["fixed_gwg"]["per_trial_macro_mape"]
+        fc = protos["fixed_confined"]["per_trial_macro_mape"]
+        ag = protos["adaptive_gwg"]["per_trial_macro_mape"]
+        out[n] = {
+            "confinement": paired_diff_ci95(fg, fc),
+            "adaptation": paired_diff_ci95(fc, ag),
+        }
+    return out
+
+
 def compute_av_readiness(main):
     """
     Reframe the convergence curves against a V2X latency budget: at 100 ms per
@@ -1348,7 +1413,8 @@ def _bars(ax, node_counts, values, errs=None):
 
 
 def make_figures(main, churn, mobility, sensitivity, av, restart,
-                 road_mobility=None, out_dir=OUT_DIR):
+                 road_mobility=None, ablation_significance=None,
+                 road_ablation_significance=None, out_dir=OUT_DIR):
     if plt is None:
         print(f"\nFigures skipped, matplotlib unavailable: {MATPLOTLIB_IMPORT_ERROR}")
         return []
@@ -1559,6 +1625,51 @@ def make_figures(main, churn, mobility, sensitivity, av, restart,
         _style(ax)
         save(fig, "fig11_road_mobility.png")
 
+    # Fig 12 -- paired significance ("forest plot") for the adaptation question:
+    # does adaptive region management change macro MAPE relative to a
+    # region-confined fixed grid, tested on the paired per-trial difference
+    # rather than by eyeballing whether independent CIs overlap.
+    if ablation_significance:
+        rows = []  # (label, mean_diff, ci95) -- diff sign flipped so
+                   # positive = adaptive-GWG worse (higher error) than confined.
+        for n in node_counts:
+            a = ablation_significance[n]["adaptation"]
+            rows.append((f"N={n}\n(random walk)", -a["mean_diff"], a["ci95"]))
+        if road_ablation_significance:
+            for n in sorted(road_ablation_significance):
+                a = road_ablation_significance[n]["adaptation"]
+                rows.append((f"N={n}\n(road-constrained)", -a["mean_diff"], a["ci95"]))
+
+        fig, ax = plt.subplots(figsize=(6.0, 0.9 * len(rows) + 1.2))
+        y = np.arange(len(rows))
+        diffs = [r[1] for r in rows]
+        errs = [r[2] for r in rows]
+        colors = ["#D55E00" if abs(d) > e else "#5B5B5B" for d, e in zip(diffs, errs)]
+        ax.axvline(0, color="#888", lw=1.2, ls="-")
+        ax.errorbar(diffs, y, xerr=errs, fmt="o", ms=7, lw=2, capsize=4,
+                    ecolor="#5B5B5B", mec="black", mfc="white", zorder=3)
+        for yi, d, c in zip(y, diffs, colors):
+            ax.plot(d, yi, "o", ms=9, color=c, zorder=2)
+        ax.set_yticks(y)
+        ax.set_yticklabels([r[0] for r in rows])
+        ax.set_xlabel("Paired difference, adaptive-GWG − fixed-confined (macro MAPE points)\n"
+                      "positive = adaptation makes it worse; error bars are 95% paired CI")
+        ax.set_title("Does adaptive region management change accuracy?\n"
+                     "(paired test on same-trial difference, not independent-CI overlap)",
+                     fontweight="bold")
+        from matplotlib.lines import Line2D
+        legend_handles = [
+            Line2D([0], [0], marker="o", color="none", mfc="#5B5B5B", mec="black",
+                  ms=9, label="95% CI includes zero (not significant)"),
+            Line2D([0], [0], marker="o", color="none", mfc="#D55E00", mec="black",
+                  ms=9, label="95% CI excludes zero (significant)"),
+        ]
+        ax.legend(handles=legend_handles, frameon=False, fontsize=8, loc="upper left",
+                 bbox_to_anchor=(0.0, -0.28))
+        ax.invert_yaxis()
+        _style(ax)
+        save(fig, "fig12_paired_significance.png")
+
     return saved
 
 
@@ -1597,6 +1708,8 @@ def main():
     av = compute_av_readiness(main_results)
     road_network = _load_road_network()
     road_mobility_results = run_road_mobility_comparison(pool, road_network)
+    ablation_significance = compute_ablation_significance(main_results)
+    road_ablation_significance = compute_ablation_significance(road_mobility_results)
 
     print_main_table(main_results)
     print_attribution(main_results)
@@ -1606,7 +1719,9 @@ def main():
 
     print("\n>>> Figures", flush=True)
     make_figures(main_results, churn_results, mobility_results, sensitivity_results,
-                 av, restart_results, road_mobility=road_mobility_results)
+                 av, restart_results, road_mobility=road_mobility_results,
+                 ablation_significance=ablation_significance,
+                 road_ablation_significance=road_ablation_significance)
 
     os.makedirs(RESULTS_DIR, exist_ok=True)
     payload = {
@@ -1636,6 +1751,11 @@ def main():
         "road_mobility": {str(k): v for k, v in road_mobility_results.items()},
         "av_readiness": {str(k): {p: {str(b): d for b, d in row.items()}
                                   for p, row in v.items()} for k, v in av.items()},
+        # Paired (same-trial) significance tests backing Section VI-B/VI-J's
+        # "no measurable difference" / "measurable liability" claims -- see
+        # compute_ablation_significance and paired_diff_ci95.
+        "ablation_significance": {str(k): v for k, v in ablation_significance.items()},
+        "road_ablation_significance": {str(k): v for k, v in road_ablation_significance.items()},
     }
     path = os.path.join(RESULTS_DIR, "results.json")
     with open(path, "w") as fh:

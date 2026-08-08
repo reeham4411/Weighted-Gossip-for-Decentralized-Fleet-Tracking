@@ -52,6 +52,8 @@ def main():
     refresh = {int(k): v for k, v in d["refresh_sweep"].items()}
     av = {int(k): v for k, v in d["av_readiness"].items()}
     road = {int(k): v for k, v in d["road_mobility"].items()}
+    sig = {int(k): v for k, v in d["ablation_significance"].items()}
+    road_sig = {int(k): v for k, v in d["road_ablation_significance"].items()}
     sizes = sorted(main_r)
     cells_total = cfg["grid_size"] ** 2
     big = sizes[-1]
@@ -188,37 +190,44 @@ def main():
     adapt_gains = [pct(main_r[n]["fixed_confined"]["macro_mape"],
                        main_r[n]["adaptive_gwg"]["macro_mape"]) for n in sizes]
 
-    def separates(n):
-        """Do the confined and adaptive 95% intervals separate at this N?"""
-        c, a = main_r[n]["fixed_confined"], main_r[n]["adaptive_gwg"]
-        return (a["macro_mape"] + a["macro_mape_ci95"] < c["macro_mape"] - c["macro_mape_ci95"]
-                or c["macro_mape"] + c["macro_mape_ci95"] < a["macro_mape"] - a["macro_mape_ci95"])
-
     confine_str = ", ".join(
         "{:+.1f}% at N={} ({:.0f} vehicles/cell)".format(g, n, n / cells_total)
         for g, n in zip(confine_gains, sizes))
     adapt_str = ", ".join("{:+.1f}% at N={}".format(g, n)
                           for g, n in zip(adapt_gains, sizes))
-    ci_str = "; ".join(
-        "N={}: {:.2f} +/- {:.2f} against {:.2f} +/- {:.2f}".format(
-            n, main_r[n]["fixed_confined"]["macro_mape"],
-            main_r[n]["fixed_confined"]["macro_mape_ci95"],
-            main_r[n]["adaptive_gwg"]["macro_mape"],
-            main_r[n]["adaptive_gwg"]["macro_mape_ci95"])
-        for n in sizes)
 
     w(f"**Region confinement accounts for the entire improvement.** Restricting peer "
       f"selection to the sender's own cell — a one-line change to the fixed-grid "
       f"baseline — is worth {confine_str}.\n")
     w(f"**Adaptive region management adds nothing measurable on top of it:** "
-      f"{adapt_str}. Every one of these is negative or negligible, and at no fleet size "
-      f"do the two confidence intervals separate ({ci_str}). Adaptive-GWG additionally "
-      f"carries region-management control traffic that the confined baseline does not "
-      f"(Section VI-D).\n")
-    if any(separates(n) for n in sizes):
-        w("(The intervals do separate at "
-          + ", ".join(f"N={n}" for n in sizes if separates(n))
-          + " — see Table III for the direction.)\n")
+      f"{adapt_str}. Every one of these is negative or negligible.\n")
+
+    w("Fig. 12 plots this test as a forest plot, alongside its road-constrained "
+      "counterpart from Section VI-J.\n")
+    w("**TABLE III-A. PAIRED SIGNIFICANCE TEST (adaptive_gwg − fixed_confined, "
+      "macro MAPE points)**\n")
+    w("| N | Paired mean diff | 95% CI (paired) | Significant at 95%? |")
+    w("|---|---|---|---|")
+    for n in sizes:
+        a = sig[n]["adaptation"]
+        w(f"| {n} | {-a['mean_diff']:+.2f} pts | ± {a['ci95']:.2f} pts | "
+          f"{'yes' if a['significant'] else 'no'} |")
+    w("")
+    w("Because every trial pairs the same fleet across all four protocols (Section "
+      "V-B), the statistically correct test for 'does adaptation change the error' is "
+      "on the *paired* per-trial difference, not on whether Adaptive-GWG's and Fixed "
+      "GWG (region-confined)'s independent confidence intervals happen to overlap. "
+      "The paired test cancels the trial-to-trial fleet variance both protocols share "
+      "and is therefore strictly more powerful than an overlap check — it can detect a "
+      "real difference that an overlap check would miss, which makes it the right tool "
+      "for a claim of *no* difference. Table III-A applies it: at every fleet size "
+      "tested, the paired 95% confidence interval on the difference includes zero, so "
+      "the null hypothesis of no effect from adaptive region management cannot be "
+      "rejected at the 95% level — a stronger and more specific statement than 'the "
+      "raw intervals overlap'. Adaptive-GWG additionally carries region-management "
+      "control traffic that the confined baseline does not (Section VI-D), so even a "
+      "statistically indistinguishable accuracy difference is a net cost once traffic "
+      "is priced in.\n")
 
     w("We report this as the paper's principal finding, and it is worth being direct "
       "about what it means. The adaptive merge/split layer is the component this line of "
@@ -554,14 +563,18 @@ def main():
       f"assignment, radio range, and the congestion field are unchanged — only how "
       f"vehicles move through the same square changes.\n")
     w("Fig. 11 plots both mobility models side by side.\n")
-    w("**TABLE X. RANDOM WALK VS. ROAD-CONSTRAINED MOBILITY (macro MAPE %)**\n")
+    w(f"**TABLE X. RANDOM WALK VS. ROAD-CONSTRAINED MOBILITY (macro MAPE %, "
+      f"95% CI — road-constrained rows use {cfg['road_mobility_trials']} trials, "
+      f"random-walk rows use {cfg['trials']})**\n")
     w("| N | Mobility model | " + " | ".join(NAMES[p] for p in ORDER) + " |")
     w("|---|---|" + "---|" * len(ORDER))
     for n in sorted(road):
         w(f"| {n} | Random walk | " +
-          " | ".join(f"{main_r[n][p]['macro_mape']:.2f}" for p in ORDER) + " |")
+          " | ".join(f"{main_r[n][p]['macro_mape']:.2f} ± {main_r[n][p]['macro_mape_ci95']:.2f}"
+                     for p in ORDER) + " |")
         w(f"| {n} | Road-constrained | " +
-          " | ".join(f"{road[n][p]['macro_mape']:.2f}" for p in ORDER) + " |")
+          " | ".join(f"{road[n][p]['macro_mape']:.2f} ± {road[n][p]['macro_mape_ci95']:.2f}"
+                     for p in ORDER) + " |")
     w("")
     road_n = sorted(road)[0]
     rw_confine = pct(main_r[road_n]["fixed_gwg"]["macro_mape"],
@@ -577,12 +590,28 @@ def main():
       f"adaptive region management adds {rw_adapt:+.1f}% and {rd_adapt:+.1f}% "
       f"respectively on top of confinement.\n")
 
+    road_adapt_sig = road_sig[road_n]["adaptation"]
+    road_confine_sig = road_sig[road_n]["confinement"]
+    w(f"This check runs only {cfg['road_mobility_trials']} trials, so the road-constrained "
+      f"numbers need their own uncertainty rather than borrowing the confidence the "
+      f"headline result earns from {cfg['trials']}. Paired across those "
+      f"{cfg['road_mobility_trials']} trials (same fleet, same seed, per "
+      f"`paired_diff_ci95`): confinement still reduces macro MAPE by "
+      f"{road_confine_sig['mean_diff']:.2f} ± {road_confine_sig['ci95']:.2f} points "
+      f"({'significant' if road_confine_sig['significant'] else 'not significant'} at "
+      f"95%), and adaptive region management on top of confinement changes macro MAPE by "
+      f"{-road_adapt_sig['mean_diff']:+.2f} ± {road_adapt_sig['ci95']:.2f} points "
+      f"({'significant' if road_adapt_sig['significant'] else 'not significant'} at "
+      f"95%).\n")
+
     # Two independent questions, not one: does confinement still explain the
     # improvement, and does adaptive management's cost change under real streets?
     # Conflating them into a single "holds / doesn't hold" verdict would have
-    # under-reported exactly the outcome this check actually turned up.
+    # under-reported exactly the outcome this check actually turned up. Gated on
+    # the paired test, not just the magnitude, so "a real degradation, not noise"
+    # is a statement the data actually supports at this trial count.
     confine_holds = rd_confine > 5.0
-    adapt_notably_worse = rd_adapt < rw_adapt - 5.0
+    adapt_notably_worse = (rd_adapt < rw_adapt - 5.0) and road_adapt_sig["significant"]
     if confine_holds and not adapt_notably_worse:
         w("The direction of every finding in Section VI-B survives the switch to real "
           "street topology: confinement accounts for the large majority of the "
@@ -592,11 +621,12 @@ def main():
     elif confine_holds and adapt_notably_worse:
         w(f"Confinement's advantage survives the switch to real street topology "
           f"essentially intact ({rw_confine:.1f}% → {rd_confine:.1f}%). Adaptive region "
-          f"management does not: under the random walk it was indistinguishable from "
-          f"free ({rw_adapt:+.1f}%), but under road-constrained movement it costs "
-          f"{-rd_adapt:.1f}% relative to the confined baseline — a real degradation, not "
-          f"noise. This strengthens rather than undercuts Section VI-B's conclusion: the "
-          f"case for skipping adaptive region management does not weaken under a more "
+          f"management does not: under the random walk the paired test above finds no "
+          f"significant effect, but under road-constrained movement it costs "
+          f"{-rd_adapt:.1f}% relative to the confined baseline, and that difference *is* "
+          f"significant at the 95% level even at this trial count — a real degradation, "
+          f"not noise. This strengthens rather than undercuts Section VI-B's conclusion: "
+          f"the case for skipping adaptive region management does not weaken under a more "
           f"realistic mobility model, it gets stronger, plausibly because a street grid "
           f"changes cell-boundary-crossing frequency (and so how often the "
           f"re-initialization cost of Section VI-F is paid) in a way the adaptive layer's "
@@ -709,6 +739,10 @@ def main():
         ("fig10_restart_interval.png", "Push-sum restart interval sweep."),
         ("fig11_road_mobility.png",
          "Random-walk versus real-street-network mobility, at matched fleet size."),
+        ("fig12_paired_significance.png",
+         "Paired significance test (Table III-A) for the adaptation question, plotted "
+         "as a forest plot of the paired difference and its 95% CI at every fleet size "
+         "and mobility model tested."),
     ]:
         w(f"- **{name}** — {cap}")
     w("")
@@ -746,6 +780,11 @@ def main():
         M.append(f"| Gain from adaptation, N={n} | "
                  f"{pct(main_r[n]['fixed_confined']['macro_mape'], main_r[n]['adaptive_gwg']['macro_mape']):+.1f}% "
                  f"| derived from `main.{n}` |")
+        a_sig = sig[n]["adaptation"]
+        M.append(f"| Paired significance, adaptation gain, N={n} | "
+                 f"{-a_sig['mean_diff']:+.2f} ± {a_sig['ci95']:.2f} pts "
+                 f"({'significant' if a_sig['significant'] else 'not significant'} at 95%) "
+                 f"| `ablation_significance.{n}.adaptation` |")
     M.append(f"| Cross-region exchanges, Fixed GWG, N={big} | {xr['fixed_gwg']:.1f}% "
              f"| `main.{big}.fixed_gwg.cross_region_exchange_pct` |")
     M.append(f"| Cross-region exchanges, Adaptive-GWG, N={big} | {xr['adaptive_gwg']:.1f}% "
@@ -768,10 +807,18 @@ def main():
         M.append(f"| Gain from adaptation, N={n}, road-constrained | "
                  f"{pct(road[n]['fixed_confined']['macro_mape'], road[n]['adaptive_gwg']['macro_mape']):+.1f}% "
                  f"| derived from `road_mobility.{n}` |")
+        ra_sig = road_sig[n]["adaptation"]
+        M.append(f"| Paired significance, adaptation gain, N={n}, road-constrained | "
+                 f"{-ra_sig['mean_diff']:+.2f} ± {ra_sig['ci95']:.2f} pts "
+                 f"({'significant' if ra_sig['significant'] else 'not significant'} at 95%) "
+                 f"| `road_ablation_significance.{n}.adaptation` |")
     M.append("")
     M.append("## Properties enforced by tests\n")
-    M.append("`tests/test_gwg.py` — 30 tests. Those that encode a defect found by the "
-             "audit of the earlier harness:\n")
+    test_count = sum(1 for line in open("tests/test_gwg.py")
+                     if line.startswith("def test_"))
+    M.append(f"`tests/test_gwg.py` — {test_count} tests. Those that encode a defect found "
+             "by the audit of the earlier harness, plus the paired-significance machinery "
+             "added on top of it:\n")
     for t, why in [
         ("test_push_sum_is_directional", "the exchange must not be symmetric"),
         ("test_push_sum_conserves_mass", "the convergence guarantee rests on this"),
@@ -785,6 +832,12 @@ def main():
         ("test_singleton_regions_are_excluded", "a one-vehicle average is trivially exact"),
         ("test_road_constrained_vehicles_stay_on_the_network",
          "road-constrained position must always equal the recorded edge and progress"),
+        ("test_paired_diff_ci95_uses_paired_variance_not_pooled_variance",
+         "a paired test must be more powerful than comparing independent intervals, not just different"),
+        ("test_summarize_keeps_index_aligned_per_trial_values",
+         "per-trial values must stay index-aligned across protocols or every paired test silently mispairs trials"),
+        ("test_ablation_significance_pairs_the_right_protocols",
+         "the significance test must compare the intended protocol pair, not group means"),
     ]:
         M.append(f"- `{t}` — {why}")
     with open(OUT_NUMBERS, "w") as fh:

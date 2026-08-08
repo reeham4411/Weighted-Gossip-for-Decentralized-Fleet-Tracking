@@ -23,10 +23,13 @@ Source: `results/results.json` (seed 42, 10 trials, 150 rounds).
 | Adaptive vs Uniform at N=1000 | 55% reduction | derived from `main.1000` |
 | Gain from confinement, N=100 | +9.9% | derived from `main.100` |
 | Gain from adaptation, N=100 | -0.1% | derived from `main.100` |
+| Paired significance, adaptation gain, N=100 | +0.02 ± 0.75 pts (not significant at 95%) | `ablation_significance.100.adaptation` |
 | Gain from confinement, N=500 | +57.4% | derived from `main.500` |
 | Gain from adaptation, N=500 | -3.3% | derived from `main.500` |
+| Paired significance, adaptation gain, N=500 | +0.29 ± 0.32 pts (not significant at 95%) | `ablation_significance.500.adaptation` |
 | Gain from confinement, N=1000 | +48.1% | derived from `main.1000` |
 | Gain from adaptation, N=1000 | -0.2% | derived from `main.1000` |
+| Paired significance, adaptation gain, N=1000 | +0.02 ± 0.03 pts (not significant at 95%) | `ablation_significance.1000.adaptation` |
 | Cross-region exchanges, Fixed GWG, N=1000 | 68.9% | `main.1000.fixed_gwg.cross_region_exchange_pct` |
 | Cross-region exchanges, Adaptive-GWG, N=1000 | 0.1% | `main.1000.adaptive_gwg.cross_region_exchange_pct` |
 | Control-traffic overhead at N=1000 | 0.2% | derived from `main.1000.*.bytes_per_node` |
@@ -36,10 +39,11 @@ Source: `results/results.json` (seed 42, 10 trials, 150 rounds).
 | Road network scale | 811 nodes, 873 edges | `config.road_network_nodes`, `.road_network_edges` |
 | Gain from confinement, N=1000, road-constrained | +33.5% | derived from `road_mobility.1000` |
 | Gain from adaptation, N=1000, road-constrained | -22.1% | derived from `road_mobility.1000` |
+| Paired significance, adaptation gain, N=1000, road-constrained | +2.56 ± 0.67 pts (significant at 95%) | `road_ablation_significance.1000.adaptation` |
 
 ## Properties enforced by tests
 
-`tests/test_gwg.py` — 30 tests. Those that encode a defect found by the audit of the earlier harness:
+`tests/test_gwg.py` — 33 tests. Those that encode a defect found by the audit of the earlier harness, plus the paired-significance machinery added on top of it:
 
 - `test_push_sum_is_directional` — the exchange must not be symmetric
 - `test_push_sum_conserves_mass` — the convergence guarantee rests on this
@@ -52,3 +56,6 @@ Source: `results/results.json` (seed 42, 10 trials, 150 rounds).
 - `test_different_seeds_give_different_fleets` — trials must be independent replicates
 - `test_singleton_regions_are_excluded` — a one-vehicle average is trivially exact
 - `test_road_constrained_vehicles_stay_on_the_network` — road-constrained position must always equal the recorded edge and progress
+- `test_paired_diff_ci95_uses_paired_variance_not_pooled_variance` — a paired test must be more powerful than comparing independent intervals, not just different
+- `test_summarize_keeps_index_aligned_per_trial_values` — per-trial values must stay index-aligned across protocols or every paired test silently mispairs trials
+- `test_ablation_significance_pairs_the_right_protocols` — the significance test must compare the intended protocol pair, not group means

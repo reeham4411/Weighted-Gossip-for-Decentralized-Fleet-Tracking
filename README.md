@@ -106,7 +106,7 @@ these properties so they cannot regress silently.
 │   └── processed/                   nyc_speeds.npy, road_network.json (gitignored)
 ├── results/
 │   ├── results.json                 every number the paper cites — tracked
-│   └── figures/                     fig1-fig11 (gitignored, regenerate anytime)
+│   └── figures/                     fig1-fig12 (gitignored, regenerate anytime)
 ├── paper/
 │   ├── adaptive_gwg_paper.md        hand-written sections (I-IV, VIII)
 │   ├── RESULTS.md                   Sections V-VII — GENERATED, do not hand-edit
@@ -152,7 +152,7 @@ don't ship one of their own.
 
 3. **Run everything** — main comparison, churn sweep, mobility sweep, threshold
    sweep, refresh sweep, restart-interval sweep, road-mobility robustness check,
-   AV analysis, 11 figures, and `results/results.json`:
+   AV analysis, 12 figures, and `results/results.json`:
    ```bash
    python3 src/gwg_simulation.py
    ```
@@ -174,7 +174,7 @@ bash scripts/verify_pipeline.sh
 ```
 
 Checks raw data, extraction sanity, the road-network cache, **the protocol test
-suite**, a clean simulation run, every field the paper generator reads, all 11
+suite**, a clean simulation run, every field the paper generator reads, all 12
 figures, and that the paper sections regenerate. Exits non-zero naming what failed.
 
 Running the tests is the part that matters. This project has already shipped a
