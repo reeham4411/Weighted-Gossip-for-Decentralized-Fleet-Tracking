@@ -40,5 +40,6 @@ fig*.png
 # Python test cache
 .pytest_cache/
 
-# Generated Word build of the paper (regenerate: python3 scripts/build_paper.py)
+# Generated Word/PDF builds of the paper (regenerate: python3 scripts/build_paper.py)
 paper/FULL_PAPER.docx
+paper/FULL_PAPER.pdf
