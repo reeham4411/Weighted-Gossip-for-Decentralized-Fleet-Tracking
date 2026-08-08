@@ -135,7 +135,8 @@ pip install pandas pyarrow numpy matplotlib
    ```
 
 3. **Run everything** — main comparison, churn sweep, mobility sweep, threshold
-   sweep, refresh sweep, AV analysis, 9 figures, and `results/results.json`:
+   sweep, refresh sweep, restart-interval sweep, AV analysis, 10 figures, and
+   `results/results.json`:
    ```bash
    python3 src/gwg_simulation.py
    ```
@@ -157,7 +158,7 @@ bash scripts/verify_pipeline.sh
 ```
 
 Checks raw data, extraction sanity, **the protocol test suite**, a clean
-simulation run, every field the paper generator reads, all 9 figures, and that
+simulation run, every field the paper generator reads, all 10 figures, and that
 the paper sections regenerate. Exits non-zero naming what failed.
 
 Running the tests is the part that matters. This project has already shipped a

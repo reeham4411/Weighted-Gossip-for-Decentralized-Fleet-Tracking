@@ -15,11 +15,8 @@ National University of Sciences and Technology, Islamabad, Pakistan
 > the contribution — a claim Section VI-B does not support, since the improvement belongs
 > to region confinement, with adaptation contributing nothing measurable. The team has
 > settled on the title above, which matches the finding and frames the ablation as the
-> contribution it is.
->
-> Option 1 or 2 also makes the paper a better fit for a reproducibility or
-> measurement-focused venue, where a well-controlled negative result is the point rather
-> than a disappointment.
+> contribution it is. It also fits a reproducibility or measurement-focused venue better,
+> where a well-controlled negative result is the point rather than a disappointment.
 
 ---
 
