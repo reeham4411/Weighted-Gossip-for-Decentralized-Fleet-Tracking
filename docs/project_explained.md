@@ -1,3 +1,24 @@
+> ## ⚠️ Superseded — describes the v1 design and results
+>
+> This document explains the **original** protocol design and the results produced by
+> `src/legacy/gwg_simulation_v1.py`. Those results did not survive audit and have been
+> withdrawn; see the "A correction to an earlier version of this work" section of the
+> root [`README.md`](../README.md).
+>
+> Specifically, claims in this document that no longer hold: that the exchange
+> implements push-sum (it was symmetric, so every weight stayed at 1.0); that
+> Adaptive GWG's per-region MAPE advantage of 34–96% is attributable to adaptive
+> region management (it was measured against a confounded baseline and each protocol
+> was scored against its own partition); and that vehicles are mobile (v1 never moved
+> one). Function and figure names here refer to v1 and no longer exist in `src/`.
+>
+> It is kept because Sections 1–5 and 9 — the problem framing, the data pipeline, and
+> the mathematics of gossip averaging — remain accurate and useful background. For
+> current results see [`paper/RESULTS.md`](../paper/RESULTS.md) and
+> [`paper/adaptive_gwg_paper.md`](../paper/adaptive_gwg_paper.md).
+
+---
+
 # Geo-Weighted Gossip (GWG) with Adaptive Region Management
 
 ### Parallel & Distributed Computing | Assignment 2 + Assignment 3 C-6 Extension

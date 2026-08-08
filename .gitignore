@@ -37,3 +37,9 @@ fig*.png
 # Optional: local/editor files
 .vscode/
 .idea/
+# Python test cache
+.pytest_cache/
+
+# Generated Word/PDF builds of the paper (regenerate: python3 scripts/build_paper.py)
+paper/FULL_PAPER.docx
+paper/FULL_PAPER.pdf
