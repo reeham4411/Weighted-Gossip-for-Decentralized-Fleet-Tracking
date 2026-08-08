@@ -96,13 +96,14 @@ import json, sys
 d = json.load(open("results/results.json"))
 ok = True
 for key in ("config", "main", "churn", "mobility", "road_mobility",
-            "threshold_sensitivity", "refresh_sweep", "av_readiness"):
+            "threshold_sensitivity", "refresh_sweep", "av_readiness",
+            "ablation_significance", "road_ablation_significance"):
     if key not in d:
         print(f"FAIL: results.json missing top-level '{key}'"); ok = False
 protos = ["uniform", "fixed_gwg", "fixed_confined", "adaptive_gwg"]
 fields = ["macro_mape", "macro_mape_ci95", "micro_mape", "avg_hop_m",
           "bytes_per_node", "cross_region_exchange_pct", "n_converged",
-          "control_messages", "macro_curve"]
+          "control_messages", "macro_curve", "per_trial_macro_mape"]
 for n, per in d.get("main", {}).items():
     for p in protos:
         if p not in per:
@@ -116,6 +117,10 @@ for n, per in d.get("road_mobility", {}).items():
             print(f"FAIL: road_mobility.{n} missing protocol '{p}'"); ok = False; continue
         if "macro_mape" not in per[p]:
             print(f"FAIL: road_mobility.{n}.{p} missing 'macro_mape'"); ok = False
+for n, per in d.get("ablation_significance", {}).items():
+    for question in ("confinement", "adaptation"):
+        if question not in per:
+            print(f"FAIL: ablation_significance.{n} missing '{question}'"); ok = False
 if ok:
     print(f"OK: results.json has all fields for {len(d['main'])} fleet sizes "
           f"x {len(protos)} protocols")
@@ -127,7 +132,7 @@ echo "== 7. Figures =="
 EXPECTED="fig1_convergence_curves.png fig2_final_mape.png fig3_attribution.png \
 fig4_hop_distance.png fig5_communication_cost.png fig6_churn.png \
 fig7_threshold_sensitivity.png fig8_av_readiness.png fig9_mobility.png \
-fig10_restart_interval.png fig11_road_mobility.png"
+fig10_restart_interval.png fig11_road_mobility.png fig12_paired_significance.png"
 MISSING=0
 for f in $EXPECTED; do
     if [ ! -s "results/figures/$f" ]; then
@@ -135,7 +140,7 @@ for f in $EXPECTED; do
         MISSING=1; FAIL=1
     fi
 done
-[ "$MISSING" -eq 0 ] && echo "OK: all 11 figures present and non-empty"
+[ "$MISSING" -eq 0 ] && echo "OK: all 12 figures present and non-empty"
 
 echo ""
 echo "== 8. Paper sections regenerate =="

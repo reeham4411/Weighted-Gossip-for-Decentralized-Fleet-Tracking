@@ -47,9 +47,9 @@ vehicles in continuous motion, we find that **region confinement accounts for th
 improvement**. Restricting peer selection to the sender's own grid cell — a one-line
 change to the fixed-grid baseline — reduces per-region error by 48–57% at realistic
 densities. Adding density-driven region adaptation on top of that delivers no measurable
-further benefit (−0.1% to −3.3%, with overlapping confidence intervals at every fleet
-size) while adding control traffic; the best-performing threshold setting is the one that
-changes the partition least. We further show that geographic weighting alone buys
+further benefit (−0.1% to −3.3%; a paired test on the same-trial difference finds no
+significant effect at any fleet size) while adding control traffic; the best-performing
+threshold setting is the one that changes the partition least. We further show that geographic weighting alone buys
 locality of *communication* but not of *estimation*: it cuts mean hop distance by 84%
 while leaving 68.9% of exchanges crossing region boundaries and accuracy nearly
 unchanged. Finally, we identify a drift failure mode specific to running push-sum on a
@@ -538,8 +538,11 @@ than to the combination.
 The answer is that **region confinement does the work**. Restricting gossip to the
 sender's own cell reduces per-region error by 48–57% at realistic densities. Adding
 density-driven region adaptation on top of that contributes nothing measurable: the gains
-are −0.1% to −3.3%, the confidence intervals overlap at every fleet size, and the best
-threshold configuration is the one that leaves the partition closest to untouched. The
+are −0.1% to −3.3%, and a paired test on the same-trial difference — the statistically
+correct comparison here, since every trial runs all four protocols on the same fleet —
+finds no significant effect at any fleet size, not merely intervals that happen to
+overlap. The best threshold configuration is the one that leaves the partition closest
+to untouched. The
 improvement previously reported for adaptive regions — including in our own earlier
 version of this work — is real, but it belongs to confinement, and it appeared to belong
 to adaptation only because the comparison was against gossip free to cross region

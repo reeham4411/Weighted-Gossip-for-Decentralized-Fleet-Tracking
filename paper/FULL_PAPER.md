@@ -35,9 +35,9 @@ vehicles in continuous motion, we find that **region confinement accounts for th
 improvement**. Restricting peer selection to the sender's own grid cell — a one-line
 change to the fixed-grid baseline — reduces per-region error by 48–57% at realistic
 densities. Adding density-driven region adaptation on top of that delivers no measurable
-further benefit (−0.1% to −3.3%, with overlapping confidence intervals at every fleet
-size) while adding control traffic; the best-performing threshold setting is the one that
-changes the partition least. We further show that geographic weighting alone buys
+further benefit (−0.1% to −3.3%; a paired test on the same-trial difference finds no
+significant effect at any fleet size) while adding control traffic; the best-performing
+threshold setting is the one that changes the partition least. We further show that geographic weighting alone buys
 locality of *communication* but not of *estimation*: it cuts mean hop distance by 84%
 while leaving 68.9% of exchanges crossing region boundaries and accuracy nearly
 unchanged. Finally, we identify a drift failure mode specific to running push-sum on a
@@ -593,7 +593,19 @@ Fig. 3 shows the same decomposition graphically.
 
 **Region confinement accounts for the entire improvement.** Restricting peer selection to the sender's own cell — a one-line change to the fixed-grid baseline — is worth +9.9% at N=100 (1 vehicles/cell), +57.4% at N=500 (5 vehicles/cell), +48.1% at N=1000 (10 vehicles/cell).
 
-**Adaptive region management adds nothing measurable on top of it:** -0.1% at N=100, -3.3% at N=500, -0.2% at N=1000. Every one of these is negative or negligible, and at no fleet size do the two confidence intervals separate (N=100: 19.59 +/- 1.93 against 19.60 +/- 2.03; N=500: 8.91 +/- 0.53 against 9.20 +/- 0.52; N=1000: 9.03 +/- 0.32 against 9.04 +/- 0.33). Adaptive-GWG additionally carries region-management control traffic that the confined baseline does not (Section VI-D).
+**Adaptive region management adds nothing measurable on top of it:** -0.1% at N=100, -3.3% at N=500, -0.2% at N=1000. Every one of these is negative or negligible.
+
+Fig. 12 plots this test as a forest plot, alongside its road-constrained counterpart from Section VI-J.
+
+**TABLE III-A. PAIRED SIGNIFICANCE TEST (adaptive_gwg − fixed_confined, macro MAPE points)**
+
+| N | Paired mean diff | 95% CI (paired) | Significant at 95%? |
+|---|---|---|---|
+| 100 | +0.02 pts | ± 0.75 pts | no |
+| 500 | +0.29 pts | ± 0.32 pts | no |
+| 1000 | +0.02 pts | ± 0.03 pts | no |
+
+Because every trial pairs the same fleet across all four protocols (Section V-B), the statistically correct test for 'does adaptation change the error' is on the *paired* per-trial difference, not on whether Adaptive-GWG's and Fixed GWG (region-confined)'s independent confidence intervals happen to overlap. The paired test cancels the trial-to-trial fleet variance both protocols share and is therefore strictly more powerful than an overlap check — it can detect a real difference that an overlap check would miss, which makes it the right tool for a claim of *no* difference. Table III-A applies it: at every fleet size tested, the paired 95% confidence interval on the difference includes zero, so the null hypothesis of no effect from adaptive region management cannot be rejected at the 95% level — a stronger and more specific statement than 'the raw intervals overlap'. Adaptive-GWG additionally carries region-management control traffic that the confined baseline does not (Section VI-D), so even a statistically indistinguishable accuracy difference is a net cost once traffic is priced in.
 
 We report this as the paper's principal finding, and it is worth being direct about what it means. The adaptive merge/split layer is the component this line of work — including our own earlier version of it — treats as the novel contribution. Measured against gossip that is free to cross region boundaries, it appears to deliver a large improvement. Measured against a fixed grid that simply keeps its gossip inside a cell, it delivers none. **The improvement is real; the attribution was wrong.**
 
@@ -749,16 +761,18 @@ Every result above uses a reflected random walk: a plausible but synthetic mobil
 
 Fig. 11 plots both mobility models side by side.
 
-**TABLE X. RANDOM WALK VS. ROAD-CONSTRAINED MOBILITY (macro MAPE %)**
+**TABLE X. RANDOM WALK VS. ROAD-CONSTRAINED MOBILITY (macro MAPE %, 95% CI — road-constrained rows use 5 trials, random-walk rows use 10)**
 
 | N | Mobility model | Uniform Random Gossip | Fixed GWG | Fixed GWG (region-confined) | Adaptive-GWG |
 |---|---|---|---|---|---|
-| 1000 | Random walk | 20.32 | 17.39 | 9.03 | 9.04 |
-| 1000 | Road-constrained | 18.71 | 17.42 | 11.58 | 14.13 |
+| 1000 | Random walk | 20.32 ± 0.50 | 17.39 ± 0.48 | 9.03 ± 0.32 | 9.04 ± 0.33 |
+| 1000 | Road-constrained | 18.71 ± 1.36 | 17.42 ± 0.93 | 11.58 ± 0.66 | 14.13 ± 0.81 |
 
 At N = 1000, region confinement reduces macro MAPE by 48.1% under the random walk and by 33.5% under road-constrained mobility; adaptive region management adds -0.2% and -22.1% respectively on top of confinement.
 
-Confinement's advantage survives the switch to real street topology essentially intact (48.1% → 33.5%). Adaptive region management does not: under the random walk it was indistinguishable from free (-0.2%), but under road-constrained movement it costs 22.1% relative to the confined baseline — a real degradation, not noise. This strengthens rather than undercuts Section VI-B's conclusion: the case for skipping adaptive region management does not weaken under a more realistic mobility model, it gets stronger, plausibly because a street grid changes cell-boundary-crossing frequency (and so how often the re-initialization cost of Section VI-F is paid) in a way the adaptive layer's region churn responds to badly.
+This check runs only 5 trials, so the road-constrained numbers need their own uncertainty rather than borrowing the confidence the headline result earns from 10. Paired across those 5 trials (same fleet, same seed, per `paired_diff_ci95`): confinement still reduces macro MAPE by 5.84 ± 1.04 points (significant at 95%), and adaptive region management on top of confinement changes macro MAPE by +2.56 ± 0.67 points (significant at 95%).
+
+Confinement's advantage survives the switch to real street topology essentially intact (48.1% → 33.5%). Adaptive region management does not: under the random walk the paired test above finds no significant effect, but under road-constrained movement it costs 22.1% relative to the confined baseline, and that difference *is* significant at the 95% level even at this trial count — a real degradation, not noise. This strengthens rather than undercuts Section VI-B's conclusion: the case for skipping adaptive region management does not weaken under a more realistic mobility model, it gets stronger, plausibly because a street grid changes cell-boundary-crossing frequency (and so how often the re-initialization cost of Section VI-F is paid) in a way the adaptive layer's region churn responds to badly.
 
 This check uses 5 trials rather than the headline 10, and one real street layout rather than a sweep of them (Section VII); it establishes that the finding is not an artefact of one particular synthetic mobility model, not that it holds for every real one.
 
@@ -801,6 +815,7 @@ All in `results/figures/`, regenerated by `python3 src/gwg_simulation.py`.
 - **fig9_mobility.png** — Static versus mobile networks.
 - **fig10_restart_interval.png** — Push-sum restart interval sweep.
 - **fig11_road_mobility.png** — Random-walk versus real-street-network mobility, at matched fleet size.
+- **fig12_paired_significance.png** — Paired significance test (Table III-A) for the adaptation question, plotted as a forest plot of the paired difference and its 95% CI at every fleet size and mobility model tested.
 
 ---
 
@@ -814,8 +829,11 @@ than to the combination.
 The answer is that **region confinement does the work**. Restricting gossip to the
 sender's own cell reduces per-region error by 48–57% at realistic densities. Adding
 density-driven region adaptation on top of that contributes nothing measurable: the gains
-are −0.1% to −3.3%, the confidence intervals overlap at every fleet size, and the best
-threshold configuration is the one that leaves the partition closest to untouched. The
+are −0.1% to −3.3%, and a paired test on the same-trial difference — the statistically
+correct comparison here, since every trial runs all four protocols on the same fleet —
+finds no significant effect at any fleet size, not merely intervals that happen to
+overlap. The best threshold configuration is the one that leaves the partition closest
+to untouched. The
 improvement previously reported for adaptive regions — including in our own earlier
 version of this work — is real, but it belongs to confinement, and it appeared to belong
 to adaptation only because the comparison was against gossip free to cross region
