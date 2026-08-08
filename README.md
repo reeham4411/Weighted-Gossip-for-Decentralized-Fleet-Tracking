@@ -1,4 +1,4 @@
-# Adaptive Region-Aware Geo-Weighted Push-Sum Gossip
+# Region-Constrained Geo-Weighted Push-Sum Gossip for Distributed Traffic Estimation in Mobile Vehicular Networks
 
 A leaderless gossip protocol that lets a fleet of vehicles compute live,
 **per-region** average speed with no central server — evaluated against real NYC
@@ -9,12 +9,12 @@ School of Electrical Engineering and Computer Science, NUST
 
 Four protocols are compared head to head:
 
-| Protocol | Peer candidates | Role |
-|---|---|---|
-| Uniform Random Gossip | any vehicle, geography ignored | baseline |
-| Fixed GWG | inverse-distance within radio range | baseline |
-| **Fixed GWG (region-confined)** | within range **and** own grid cell | **ablation** |
-| **Adaptive-GWG** | within range **and** own adaptive region | our protocol |
+| Protocol                        | Peer candidates                          | Role         |
+| ------------------------------- | ---------------------------------------- | ------------ |
+| Uniform Random Gossip           | any vehicle, geography ignored           | baseline     |
+| Fixed GWG                       | inverse-distance within radio range      | baseline     |
+| **Fixed GWG (region-confined)** | within range **and** own grid cell       | **ablation** |
+| **Adaptive-GWG**                | within range **and** own adaptive region | our protocol |
 
 The third row is the one that matters methodologically. Without it, a comparison
 credits adaptive region management with an improvement that region confinement —
@@ -145,6 +145,7 @@ don't ship one of their own.
 2. **Extract speeds and the road network** — prints per-file counts and the
    distribution; the second command needs network access (OpenStreetMap) and is
    run once, its output cached and gitignored like the taxi data:
+
    ```bash
    python3 src/extract_speeds.py
    python3 src/extract_roads.py
@@ -153,6 +154,7 @@ don't ship one of their own.
 3. **Run everything** — main comparison, churn sweep, mobility sweep, threshold
    sweep, refresh sweep, restart-interval sweep, road-mobility robustness check,
    AV analysis, 12 figures, and `results/results.json`:
+
    ```bash
    python3 src/gwg_simulation.py
    ```
