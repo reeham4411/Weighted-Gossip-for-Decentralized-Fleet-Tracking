@@ -95,7 +95,7 @@ def fetch_overpass_json():
     body = urllib.parse.urlencode({"data": query}).encode()
     headers = {
         "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "adaptive-gwg-research/1.0 (NUST PDC coursework)",
+        "User-Agent": "adaptive-gwg-research/1.0",
         "Accept": "application/json",
     }
     ctx = ssl.create_default_context(cafile=certifi.where())
