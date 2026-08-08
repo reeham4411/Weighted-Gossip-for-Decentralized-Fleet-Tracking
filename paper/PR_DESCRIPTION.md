@@ -63,6 +63,25 @@ The scope of the negative result is stated explicitly in Section VI-B: it holds
 for a grid already well matched to radio range with roughly uniform density,
 which is the setting this protocol was designed and previously evaluated for.
 
+## Robustness to road-constrained mobility
+
+Every result above uses a reflected random walk — the mobility assumption this
+kind of evaluation gets pushed back on hardest. Section VI-J reruns the same
+comparison with vehicles confined to a real NYC street network (811
+intersections, 873 segments, fetched from OpenStreetMap for a block the same
+size as the service area) instead of moving freely:
+
+| N | Mobility model | Gain from confinement | Gain from adaptation |
+|---|---|---|---|
+| 1000 | Random walk | +48.1% | −0.2% |
+| 1000 | Road-constrained | +33.5% | −22.1% |
+
+Confinement's advantage survives essentially intact. Adaptive region
+management does not: it goes from statistically indistinguishable from free to
+a measurable liability under real street topology. If anything, the
+random-walk model was generous to it — this strengthens Section VI-B's
+conclusion rather than qualifying it.
+
 ## What changed
 
 - `src/gwg_simulation.py` — rewritten: directional push-sum, per-round mobility
@@ -70,7 +89,9 @@ which is the setting this protocol was designed and previously evaluated for.
   partition, control-message accounting, periodic restart, independent fleets
   per trial with 95% CIs, censored reporting of non-converging runs
 - `src/legacy/gwg_simulation_v1.py` — v1 archived so the audit stays reproducible
-- `tests/test_gwg.py` — 25 tests pinning each property above; several fail
+- `src/extract_roads.py` — fetches a real NYC street network from the Overpass
+  API (standard library only) and caches it for the road-mobility check
+- `tests/test_gwg.py` — 30 tests pinning each property above; several fail
   against v1 by design
 - `scripts/make_results_sections.py` — paper Sections V–VII generated from
   `results/results.json`, so no number is hand-transcribed
@@ -92,5 +113,5 @@ of the claim it retracts.
 ## Verification
 
 `bash scripts/verify_pipeline.sh` passes end to end: raw data, extraction
-sanity, 25/25 tests, clean simulation, every field the generator reads, all 10
-figures, and the paper assembling.
+sanity, the cached road network, 30/30 tests, clean simulation, every field the
+generator reads, all 11 figures, and the paper assembling.

@@ -5,11 +5,12 @@
 # Checks, in order:
 #   1. raw parquet data is present
 #   2. extract_speeds.py runs and produces a sane nyc_speeds.npy
-#   3. the protocol test suite passes            <- correctness, not just "it ran"
-#   4. gwg_simulation.py runs and writes results/results.json
-#   5. results.json contains every field the paper's generator reads
-#   6. all figures are present and non-empty
-#   7. the paper's results sections regenerate from results.json
+#   3. the cached road network for the road-mobility robustness check is present
+#   4. the protocol test suite passes            <- correctness, not just "it ran"
+#   5. gwg_simulation.py runs and writes results/results.json
+#   6. results.json contains every field the paper's generator reads
+#   7. all figures are present and non-empty
+#   8. the paper's results sections regenerate from results.json
 #
 # Exits non-zero listing every failure. Run before any push.
 
@@ -48,7 +49,27 @@ sys.exit(0 if ok else 1)
 EOF
 
 echo ""
-echo "== 3. Protocol correctness tests =="
+echo "== 3. Road network cache =="
+if [ ! -s data/processed/road_network.json ]; then
+    echo "FAIL: data/processed/road_network.json missing"
+    echo "      run 'python3 src/extract_roads.py' (needs network access, run once)"
+    exit 1
+fi
+$PY - <<'EOF' || FAIL=1
+import json, sys
+d = json.load(open("data/processed/road_network.json"))
+ok = True
+if len(d.get("nodes", {})) < 10:
+    print(f"FAIL: only {len(d.get('nodes', {}))} road nodes — implausible for a real block"); ok = False
+if len(d.get("edges", [])) < 10:
+    print(f"FAIL: only {len(d.get('edges', []))} road edges — implausible for a real block"); ok = False
+if ok:
+    print(f"OK: {len(d['nodes'])} nodes, {len(d['edges'])} edges")
+sys.exit(0 if ok else 1)
+EOF
+
+echo ""
+echo "== 4. Protocol correctness tests =="
 # These are the point of the check. A pipeline that runs cleanly while computing
 # the wrong thing is exactly the failure this repo already had once.
 if $PY tests/test_gwg.py; then
@@ -59,7 +80,7 @@ else
 fi
 
 echo ""
-echo "== 4. gwg_simulation.py (a few minutes) =="
+echo "== 5. gwg_simulation.py (a few minutes) =="
 rm -f results/figures/fig*.png results/results.json
 if ! $PY src/gwg_simulation.py > /tmp/gwg_run.log 2>&1; then
     echo "FAIL: gwg_simulation.py exited non-zero — see /tmp/gwg_run.log"
@@ -69,12 +90,12 @@ fi
 echo "OK: simulation completed"
 
 echo ""
-echo "== 5. results.json completeness =="
+echo "== 6. results.json completeness =="
 $PY - <<'EOF' || FAIL=1
 import json, sys
 d = json.load(open("results/results.json"))
 ok = True
-for key in ("config", "main", "churn", "mobility",
+for key in ("config", "main", "churn", "mobility", "road_mobility",
             "threshold_sensitivity", "refresh_sweep", "av_readiness"):
     if key not in d:
         print(f"FAIL: results.json missing top-level '{key}'"); ok = False
@@ -89,6 +110,12 @@ for n, per in d.get("main", {}).items():
         for f in fields:
             if f not in per[p]:
                 print(f"FAIL: main.{n}.{p} missing '{f}'"); ok = False
+for n, per in d.get("road_mobility", {}).items():
+    for p in protos:
+        if p not in per:
+            print(f"FAIL: road_mobility.{n} missing protocol '{p}'"); ok = False; continue
+        if "macro_mape" not in per[p]:
+            print(f"FAIL: road_mobility.{n}.{p} missing 'macro_mape'"); ok = False
 if ok:
     print(f"OK: results.json has all fields for {len(d['main'])} fleet sizes "
           f"x {len(protos)} protocols")
@@ -96,11 +123,11 @@ sys.exit(0 if ok else 1)
 EOF
 
 echo ""
-echo "== 6. Figures =="
+echo "== 7. Figures =="
 EXPECTED="fig1_convergence_curves.png fig2_final_mape.png fig3_attribution.png \
 fig4_hop_distance.png fig5_communication_cost.png fig6_churn.png \
 fig7_threshold_sensitivity.png fig8_av_readiness.png fig9_mobility.png \
-fig10_restart_interval.png"
+fig10_restart_interval.png fig11_road_mobility.png"
 MISSING=0
 for f in $EXPECTED; do
     if [ ! -s "results/figures/$f" ]; then
@@ -108,10 +135,10 @@ for f in $EXPECTED; do
         MISSING=1; FAIL=1
     fi
 done
-[ "$MISSING" -eq 0 ] && echo "OK: all 10 figures present and non-empty"
+[ "$MISSING" -eq 0 ] && echo "OK: all 11 figures present and non-empty"
 
 echo ""
-echo "== 7. Paper sections regenerate =="
+echo "== 8. Paper sections regenerate =="
 if $PY scripts/make_results_sections.py >/dev/null; then
     if [ -s paper/RESULTS.md ] && [ -s paper/NUMBERS.md ]; then
         echo "OK: paper/RESULTS.md and paper/NUMBERS.md regenerated from results.json"

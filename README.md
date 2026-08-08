@@ -47,6 +47,13 @@ N=1000, the gossip graph still spans the service area, and push-sum still
 converges toward the city-wide mean. Confinement, not weighting, is what makes an
 estimate regional.
 
+Every number above uses a reflected random walk, the one mobility assumption
+reviewers push back on hardest. A robustness check (`run_road_mobility_comparison`
+in `src/gwg_simulation.py`, Section VI-J of the paper, fig11) reruns the same
+comparison with vehicles confined to a real NYC street network fetched via
+OpenStreetMap instead — see [`paper/RESULTS.md`](paper/RESULTS.md) for whether the
+finding survives it.
+
 Exact figures, confidence intervals and the claim-to-evidence map:
 [`paper/RESULTS.md`](paper/RESULTS.md) and [`paper/NUMBERS.md`](paper/NUMBERS.md),
 both generated from `results/results.json`.
@@ -82,11 +89,12 @@ these properties so they cannot regress silently.
 ├── README.md
 ├── src/
 │   ├── extract_speeds.py            NYC TLC parquet -> data/processed/nyc_speeds.npy
+│   ├── extract_roads.py             OSM street network -> data/processed/road_network.json
 │   ├── gwg_simulation.py            all protocols, experiments, figures, results.json
 │   └── legacy/
 │       └── gwg_simulation_v1.py     archived; kept so the audit stays reproducible
 ├── tests/
-│   └── test_gwg.py                  25 protocol-correctness tests
+│   └── test_gwg.py                  30 protocol-correctness tests
 ├── scripts/
 │   ├── verify_pipeline.sh           one-command end-to-end verification
 │   ├── make_results_sections.py     results.json -> paper Sections V-VII
@@ -95,10 +103,10 @@ these properties so they cannot regress silently.
 │   └── audit_ablation.py            evidence that the v1 comparison was confounded
 ├── data/
 │   ├── raw/                         yellow_tripdata_*.parquet (gitignored)
-│   └── processed/                   nyc_speeds.npy (gitignored)
+│   └── processed/                   nyc_speeds.npy, road_network.json (gitignored)
 ├── results/
 │   ├── results.json                 every number the paper cites — tracked
-│   └── figures/                     fig1-fig10 (gitignored, regenerate anytime)
+│   └── figures/                     fig1-fig11 (gitignored, regenerate anytime)
 ├── paper/
 │   ├── adaptive_gwg_paper.md        hand-written sections (I-IV, VIII)
 │   ├── RESULTS.md                   Sections V-VII — GENERATED, do not hand-edit
@@ -119,8 +127,13 @@ evidence the paper's numbers are checked against.
 ```bash
 python3 -m venv venv
 source venv/bin/activate            # Windows: venv\Scripts\activate
-pip install pandas pyarrow numpy matplotlib
+pip install pandas pyarrow numpy matplotlib certifi
 ```
+
+No geopandas/osmnx dependency chain for the road network: `src/extract_roads.py`
+queries the Overpass API directly with the standard library's `urllib`.
+`certifi` supplies a CA bundle for the request — Python.org's macOS builds
+don't ship one of their own.
 
 ## Running the pipeline
 
@@ -129,14 +142,17 @@ pip install pandas pyarrow numpy matplotlib
    named `yellow_tripdata_YYYY-MM.parquet`. Every matching file is combined
    automatically; no code change is needed to add months.
 
-2. **Extract speeds** — prints per-file counts and the distribution:
+2. **Extract speeds and the road network** — prints per-file counts and the
+   distribution; the second command needs network access (OpenStreetMap) and is
+   run once, its output cached and gitignored like the taxi data:
    ```bash
    python3 src/extract_speeds.py
+   python3 src/extract_roads.py
    ```
 
 3. **Run everything** — main comparison, churn sweep, mobility sweep, threshold
-   sweep, refresh sweep, restart-interval sweep, AV analysis, 10 figures, and
-   `results/results.json`:
+   sweep, refresh sweep, restart-interval sweep, road-mobility robustness check,
+   AV analysis, 11 figures, and `results/results.json`:
    ```bash
    python3 src/gwg_simulation.py
    ```
@@ -157,9 +173,9 @@ and `paper/NUMBERS.md` are generated files — edit the generator, not the outpu
 bash scripts/verify_pipeline.sh
 ```
 
-Checks raw data, extraction sanity, **the protocol test suite**, a clean
-simulation run, every field the paper generator reads, all 10 figures, and that
-the paper sections regenerate. Exits non-zero naming what failed.
+Checks raw data, extraction sanity, the road-network cache, **the protocol test
+suite**, a clean simulation run, every field the paper generator reads, all 11
+figures, and that the paper sections regenerate. Exits non-zero naming what failed.
 
 Running the tests is the part that matters. This project has already shipped a
 pipeline that ran cleanly end to end while computing the wrong quantity; a green
@@ -191,5 +207,9 @@ Then open a PR into `main`. The parquet files, `nyc_speeds.npy` and
 - **Different densities:** the density regime is set by `N / GRID_SIZE²`, not by
   fleet size alone. To probe the regime boundary, vary `NODE_COUNTS` or
   `GRID_SIZE` in `src/gwg_simulation.py`.
-- **A road-constrained mobility trace** would be the single most valuable
-  improvement — see the limitations section of the paper.
+- **More real street layouts:** `src/extract_roads.py` fetches one NYC block;
+  `run_road_mobility_comparison` in `src/gwg_simulation.py` already reruns the
+  main comparison against whatever `data/processed/road_network.json` holds, so
+  pointing `CENTER_LAT`/`CENTER_LON` at a different neighbourhood and re-running
+  is how to check whether Section VI-J's result is specific to one block or
+  general — see the limitations section of the paper.

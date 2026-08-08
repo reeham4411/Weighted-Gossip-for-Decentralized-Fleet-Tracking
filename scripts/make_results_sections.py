@@ -51,6 +51,7 @@ def main():
     sens = d["threshold_sensitivity"]
     refresh = {int(k): v for k, v in d["refresh_sweep"].items()}
     av = {int(k): v for k, v in d["av_readiness"].items()}
+    road = {int(k): v for k, v in d["road_mobility"].items()}
     sizes = sorted(main_r)
     cells_total = cfg["grid_size"] ** 2
     big = sizes[-1]
@@ -541,6 +542,81 @@ def main():
       "or fleet size — consistent with Section VI-C, they are converging to the wrong "
       "quantity, and no amount of additional time repairs that.\n")
 
+    w("### J. Robustness to Road-Constrained Mobility\n")
+    w(f"Every result above uses a reflected random walk: a plausible but synthetic "
+      f"mobility model, and the one caveat reviewers of this line of work raise most "
+      f"often. To check whether the confinement finding is an artefact of that choice, "
+      f"we rerun the same four-protocol comparison with vehicles confined to a real "
+      f"NYC street network ({cfg['road_network_nodes']} intersections, "
+      f"{cfg['road_network_edges']} street segments, fetched via OpenStreetMap for a "
+      f"block the same size as the service area) instead of moving freely: a vehicle "
+      f"drives along its current street and turns only at an intersection. Region "
+      f"assignment, radio range, and the congestion field are unchanged — only how "
+      f"vehicles move through the same square changes.\n")
+    w("Fig. 11 plots both mobility models side by side.\n")
+    w("**TABLE X. RANDOM WALK VS. ROAD-CONSTRAINED MOBILITY (macro MAPE %)**\n")
+    w("| N | Mobility model | " + " | ".join(NAMES[p] for p in ORDER) + " |")
+    w("|---|---|" + "---|" * len(ORDER))
+    for n in sorted(road):
+        w(f"| {n} | Random walk | " +
+          " | ".join(f"{main_r[n][p]['macro_mape']:.2f}" for p in ORDER) + " |")
+        w(f"| {n} | Road-constrained | " +
+          " | ".join(f"{road[n][p]['macro_mape']:.2f}" for p in ORDER) + " |")
+    w("")
+    road_n = sorted(road)[0]
+    rw_confine = pct(main_r[road_n]["fixed_gwg"]["macro_mape"],
+                     main_r[road_n]["fixed_confined"]["macro_mape"])
+    rw_adapt = pct(main_r[road_n]["fixed_confined"]["macro_mape"],
+                   main_r[road_n]["adaptive_gwg"]["macro_mape"])
+    rd_confine = pct(road[road_n]["fixed_gwg"]["macro_mape"],
+                     road[road_n]["fixed_confined"]["macro_mape"])
+    rd_adapt = pct(road[road_n]["fixed_confined"]["macro_mape"],
+                   road[road_n]["adaptive_gwg"]["macro_mape"])
+    w(f"At N = {road_n}, region confinement reduces macro MAPE by {rw_confine:.1f}% under "
+      f"the random walk and by {rd_confine:.1f}% under road-constrained mobility; "
+      f"adaptive region management adds {rw_adapt:+.1f}% and {rd_adapt:+.1f}% "
+      f"respectively on top of confinement.\n")
+
+    # Two independent questions, not one: does confinement still explain the
+    # improvement, and does adaptive management's cost change under real streets?
+    # Conflating them into a single "holds / doesn't hold" verdict would have
+    # under-reported exactly the outcome this check actually turned up.
+    confine_holds = rd_confine > 5.0
+    adapt_notably_worse = rd_adapt < rw_adapt - 5.0
+    if confine_holds and not adapt_notably_worse:
+        w("The direction of every finding in Section VI-B survives the switch to real "
+          "street topology: confinement accounts for the large majority of the "
+          "improvement, and adaptive region management adds little to nothing beyond "
+          "it. Road-constrained movement is not why this evaluation found what it "
+          "found.\n")
+    elif confine_holds and adapt_notably_worse:
+        w(f"Confinement's advantage survives the switch to real street topology "
+          f"essentially intact ({rw_confine:.1f}% → {rd_confine:.1f}%). Adaptive region "
+          f"management does not: under the random walk it was indistinguishable from "
+          f"free ({rw_adapt:+.1f}%), but under road-constrained movement it costs "
+          f"{-rd_adapt:.1f}% relative to the confined baseline — a real degradation, not "
+          f"noise. This strengthens rather than undercuts Section VI-B's conclusion: the "
+          f"case for skipping adaptive region management does not weaken under a more "
+          f"realistic mobility model, it gets stronger, plausibly because a street grid "
+          f"changes cell-boundary-crossing frequency (and so how often the "
+          f"re-initialization cost of Section VI-F is paid) in a way the adaptive layer's "
+          f"region churn responds to badly.\n")
+    else:
+        w("This is the one place a result changes direction depending on the mobility "
+          "model, and we report it rather than the more flattering random-walk number "
+          "alone: under road-constrained movement the confinement effect is smaller "
+          "than under the random walk, which is plausible on its face — vehicles "
+          "following streets cross grid-cell boundaries at a different rate than "
+          "vehicles that don't, changing how often the confined protocols pay the "
+          "region-crossing penalty Section VI-B and VI-F describe. This does not "
+          "overturn Section VI-B's conclusion, but it narrows the claim: the size of "
+          "confinement's advantage, not just its existence, depends on the mobility "
+          "model, and a deployment should not assume the random-walk figure directly.\n")
+    w(f"This check uses {cfg['road_mobility_trials']} trials rather than the headline "
+      f"{cfg['trials']}, and one real street layout rather than a sweep of them "
+      f"(Section VII); it establishes that the finding is not an artefact of one "
+      f"particular synthetic mobility model, not that it holds for every real one.\n")
+
     # ---------------------------------------------------------------- VII
     w("\n---\n")
     w("## VII. Limitations and Threats to Validity\n")
@@ -558,12 +634,31 @@ def main():
       "require. The congestion gradient is a plausible but stylized model, and results "
       "would change under a different spatial structure — for example a corridor "
       "pattern rather than a radial one.\n")
-    w("**Mobility model.** Vehicles follow a reflected random walk at their observed "
-      "speed, not a road network. Real vehicles are constrained to streets, turn at "
-      "intersections, and cluster at signals, which would make region membership more "
-      "persistent than in our model and probably reduce the re-initialization cost that "
-      "Section VI-F identifies as dominant. A road-constrained mobility trace is the "
-      "single most valuable improvement to this evaluation.\n")
+    if confine_holds and not adapt_notably_worse:
+        mobility_outcome = "and it survives"
+    elif confine_holds and adapt_notably_worse:
+        mobility_outcome = (
+            "and confinement's advantage survives; adaptive region management, however, "
+            "goes from indistinguishable-from-free to a measurable liability under real "
+            "streets, which argues against it more strongly than the random-walk result "
+            "alone does — see VI-J"
+        )
+    else:
+        mobility_outcome = (
+            "and confinement's advantage shrinks (though does not disappear) under real "
+            "streets — see VI-J for the size of that gap"
+        )
+    w(f"**Mobility model.** Every headline result (Sections VI-A through VI-I) uses a "
+      f"reflected random walk at each vehicle's observed speed, not a road network. "
+      f"Section VI-J checks the main finding against a real NYC street network at "
+      f"N = {road_n} {mobility_outcome}. That check covers one real street layout and "
+      f"{cfg['road_mobility_trials']} "
+      f"trials, not a sweep of layouts, and still ignores signals, turn restrictions, "
+      f"and lane-level behaviour that would make region membership more persistent "
+      f"still and probably reduce the re-initialization cost Section VI-F identifies "
+      f"as dominant. A sweep over several real neighbourhoods, and turn behaviour "
+      f"informed by actual signal timing, remain the most valuable next improvement "
+      f"to this evaluation.\n")
     w(f"**Scale.** We test up to N = {big} vehicles in a "
       f"{cfg['grid_size']*cfg['region_size_m']:.0f} m square. This is a dense downtown "
       f"district, not a city, and the conclusions about the sparse regime depend on "
@@ -612,6 +707,8 @@ def main():
         ("fig8_av_readiness.png", "Error available within a V2X decision deadline."),
         ("fig9_mobility.png", "Static versus mobile networks."),
         ("fig10_restart_interval.png", "Push-sum restart interval sweep."),
+        ("fig11_road_mobility.png",
+         "Random-walk versus real-street-network mobility, at matched fleet size."),
     ]:
         w(f"- **{name}** — {cap}")
     w("")
@@ -661,9 +758,19 @@ def main():
              f"| `churn.*.adaptive_gwg.macro_mape` |")
     M.append(f"| Best threshold setting | n_min={best['min']}, n_max={best['max']} → "
              f"{best['macro_mape']:.2f}% | `threshold_sensitivity` |")
+    M.append(f"| Road network scale | {cfg['road_network_nodes']} nodes, "
+             f"{cfg['road_network_edges']} edges | `config.road_network_nodes`, "
+             f"`.road_network_edges` |")
+    for n in sorted(road):
+        M.append(f"| Gain from confinement, N={n}, road-constrained | "
+                 f"{pct(road[n]['fixed_gwg']['macro_mape'], road[n]['fixed_confined']['macro_mape']):+.1f}% "
+                 f"| derived from `road_mobility.{n}` |")
+        M.append(f"| Gain from adaptation, N={n}, road-constrained | "
+                 f"{pct(road[n]['fixed_confined']['macro_mape'], road[n]['adaptive_gwg']['macro_mape']):+.1f}% "
+                 f"| derived from `road_mobility.{n}` |")
     M.append("")
     M.append("## Properties enforced by tests\n")
-    M.append("`tests/test_gwg.py` — 25 tests. Those that encode a defect found by the "
+    M.append("`tests/test_gwg.py` — 30 tests. Those that encode a defect found by the "
              "audit of the earlier harness:\n")
     for t, why in [
         ("test_push_sum_is_directional", "the exchange must not be symmetric"),
@@ -676,6 +783,8 @@ def main():
         ("test_non_converging_runs_are_not_averaged_in", "censored runs are counted, not averaged"),
         ("test_different_seeds_give_different_fleets", "trials must be independent replicates"),
         ("test_singleton_regions_are_excluded", "a one-vehicle average is trivially exact"),
+        ("test_road_constrained_vehicles_stay_on_the_network",
+         "road-constrained position must always equal the recorded edge and progress"),
     ]:
         M.append(f"- `{t}` — {why}")
     with open(OUT_NUMBERS, "w") as fh:

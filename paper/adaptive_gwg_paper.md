@@ -56,7 +56,12 @@ unchanged. Finally, we identify a drift failure mode specific to running push-su
 mobile fleet, in which re-initialization at region boundaries progressively refills a
 region with unaveraged readings and degrades error roughly fourfold from its minimum, and
 show that periodic restart bounds it — while leaving unconfined gossip untouched,
-confirming that its error floor is structural rather than a matter of scheduling.
+confirming that its error floor is structural rather than a matter of scheduling. Because
+a synthetic random-walk mobility model is the most common objection to results like these,
+we additionally validate the central finding against vehicles confined to a real NYC
+street network: region confinement's advantage survives essentially intact, and adaptive
+region management, indistinguishable from free under the random walk, becomes a
+measurable liability under real street topology — evidence against it, not for it.
 
 **Index Terms** — gossip protocols, distributed averaging, push-sum, geographic gossip,
 consensus, VANET, adaptive clustering, autonomous vehicles, cooperative perception,
@@ -551,6 +556,14 @@ number of additional rounds repairs a wrong target. Periodic restart demonstrate
 point from the other side: it improves the confined protocols roughly fourfold and leaves
 the unconfined ones essentially unchanged, because staleness was never what was wrong
 with them.
+
+A result built on a synthetic mobility model invites the objection that the model, not
+the mechanism, produced it. Section VI-J answers that directly: rerun against vehicles
+confined to a real NYC street network rather than a random walk, confinement's advantage
+survives essentially intact, and adaptive region management's cost gets *worse*, not
+better — from statistically indistinguishable from free to a measurable liability. The
+random-walk mobility model was not flattering adaptive region management; if anything it
+was generous to it.
 
 We want to be careful about the scope of the negative result. Our grid is already well
 matched to radio range, every cell lies inside its own members' communication radius, and

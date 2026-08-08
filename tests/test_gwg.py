@@ -10,9 +10,11 @@ Run from the repo root:
     python3 tests/test_gwg.py        # no pytest needed
 """
 
+import json
 import math
 import os
 import sys
+import tempfile
 
 import numpy as np
 
@@ -29,6 +31,30 @@ def _pool(n=20000, seed=0):
 
 def _fleet(n=200, seed=1):
     return G.Fleet(n, _pool(), np.random.default_rng(seed))
+
+
+def _write_road_network(nodes, edges):
+    """nodes: {id: [x, y]}, edges: [(u, v, length), ...] -> loaded G.RoadNetwork."""
+    f = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+    json.dump({"nodes": nodes, "edges": [list(e) for e in edges]}, f)
+    f.close()
+    return G.RoadNetwork(f.name)
+
+
+def _loop_network():
+    """A 1000m x 1000m square loop: every node has exactly one way forward,
+    so `next_edge` behaviour is fully deterministic and there's no dead end."""
+    nodes = {"a": [0, 0], "b": [1000, 0], "c": [1000, 1000], "d": [0, 1000]}
+    edges = [("a", "b", 1000.0), ("b", "c", 1000.0),
+             ("c", "d", 1000.0), ("d", "a", 1000.0)]
+    return _write_road_network(nodes, edges)
+
+
+def _dead_end_network():
+    """A straight line a-b-c: reaching c leaves no option but to reverse."""
+    nodes = {"a": [0, 0], "b": [500, 0], "c": [1000, 0]}
+    edges = [("a", "b", 500.0), ("b", "c", 500.0)]
+    return _write_road_network(nodes, edges)
 
 
 # --------------------------------------------------------------------------
@@ -203,6 +229,67 @@ def test_mobility_changes_cell_membership():
         f.step_mobility()
         f.refresh_true_speed()
     assert (f.cell_index() != c0).sum() > 0, "no vehicle changed cell over a full run"
+
+
+# --------------------------------------------------------------------------
+# Road-constrained mobility (run_road_mobility_comparison)
+# --------------------------------------------------------------------------
+
+def test_road_network_loads_and_is_connected():
+    net = _loop_network()
+    assert net.n_nodes == 4
+    assert len(net.edges) == 4
+    for adj in net.adjacency:
+        assert len(adj) == 2, "every node in the loop fixture has degree 2"
+
+
+def test_road_network_next_edge_avoids_uturn_unless_dead_end():
+    rng = np.random.default_rng(0)
+    loop = _loop_network()
+    a, b, c = loop.index_of["a"], loop.index_of["b"], loop.index_of["c"]
+    # Arriving at b having come from a: the only other option is c.
+    for _ in range(20):
+        nxt, _ = loop.next_edge(b, a, rng)
+        assert nxt == c, "must not immediately reverse when another edge exists"
+
+    dead_end = _dead_end_network()
+    a, b, c = dead_end.index_of["a"], dead_end.index_of["b"], dead_end.index_of["c"]
+    # Arriving at the dead end c having come from b: no other option but back to b.
+    for _ in range(20):
+        nxt, _ = dead_end.next_edge(c, b, rng)
+        assert nxt == b, "a dead end must allow reversal"
+
+
+def test_road_constrained_vehicles_stay_on_the_network():
+    """Every vehicle's (x, y) must always be the interpolation of its recorded
+    edge and progress -- not just "somewhere in the service area"."""
+    net = _loop_network()
+    f = G.Fleet(50, _pool(), np.random.default_rng(5), road_network=net)
+    for _ in range(80):
+        f.step_mobility()
+        assert (f.road_progress >= -1e-9).all()
+        assert (f.road_progress <= f.road_edge_len + 1e-6).all()
+        ex, ey = net.xy(f.road_from, f.road_to, f.road_edge_len, f.road_progress)
+        assert np.allclose(f.x, ex) and np.allclose(f.y, ey)
+
+
+def test_road_constrained_vehicles_actually_move():
+    net = _loop_network()
+    f = G.Fleet(50, _pool(), np.random.default_rng(6), road_network=net)
+    x0, y0 = f.x.copy(), f.y.copy()
+    for _ in range(50):
+        f.step_mobility()
+    assert not np.allclose(x0, f.x) or not np.allclose(y0, f.y)
+
+
+def test_road_constrained_churn_respawns_on_the_network():
+    net = _loop_network()
+    f = G.Fleet(200, _pool(), np.random.default_rng(7), road_network=net)
+    replaced = f.step_churn(0.5)
+    assert replaced > 0
+    ex, ey = net.xy(f.road_from, f.road_to, f.road_edge_len, f.road_progress)
+    assert np.allclose(f.x, ex) and np.allclose(f.y, ey), \
+        "respawned vehicles must land on an edge, not a random (x, y)"
 
 
 # --------------------------------------------------------------------------

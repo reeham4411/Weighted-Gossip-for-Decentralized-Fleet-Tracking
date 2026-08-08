@@ -242,6 +242,25 @@ Fig. 8 plots error against the decision deadline.
 
 Two observations. Under mobility, error does not decrease monotonically with the deadline: the estimate improves over the first few rounds and then degrades as boundary crossings accumulate and re-initialization discards averaging work. A longer deadline is therefore not automatically a better estimate, which is counter-intuitive and worth stating plainly for anyone sizing a real deployment. Second, the unconfined baselines never reach the usable threshold at any deadline or fleet size — consistent with Section VI-C, they are converging to the wrong quantity, and no amount of additional time repairs that.
 
+### J. Robustness to Road-Constrained Mobility
+
+Every result above uses a reflected random walk: a plausible but synthetic mobility model, and the one caveat reviewers of this line of work raise most often. To check whether the confinement finding is an artefact of that choice, we rerun the same four-protocol comparison with vehicles confined to a real NYC street network (811 intersections, 873 street segments, fetched via OpenStreetMap for a block the same size as the service area) instead of moving freely: a vehicle drives along its current street and turns only at an intersection. Region assignment, radio range, and the congestion field are unchanged — only how vehicles move through the same square changes.
+
+Fig. 11 plots both mobility models side by side.
+
+**TABLE X. RANDOM WALK VS. ROAD-CONSTRAINED MOBILITY (macro MAPE %)**
+
+| N | Mobility model | Uniform Random Gossip | Fixed GWG | Fixed GWG (region-confined) | Adaptive-GWG |
+|---|---|---|---|---|---|
+| 1000 | Random walk | 20.32 | 17.39 | 9.03 | 9.04 |
+| 1000 | Road-constrained | 18.71 | 17.42 | 11.58 | 14.13 |
+
+At N = 1000, region confinement reduces macro MAPE by 48.1% under the random walk and by 33.5% under road-constrained mobility; adaptive region management adds -0.2% and -22.1% respectively on top of confinement.
+
+Confinement's advantage survives the switch to real street topology essentially intact (48.1% → 33.5%). Adaptive region management does not: under the random walk it was indistinguishable from free (-0.2%), but under road-constrained movement it costs 22.1% relative to the confined baseline — a real degradation, not noise. This strengthens rather than undercuts Section VI-B's conclusion: the case for skipping adaptive region management does not weaken under a more realistic mobility model, it gets stronger, plausibly because a street grid changes cell-boundary-crossing frequency (and so how often the re-initialization cost of Section VI-F is paid) in a way the adaptive layer's region churn responds to badly.
+
+This check uses 5 trials rather than the headline 10, and one real street layout rather than a sweep of them (Section VII); it establishes that the finding is not an artefact of one particular synthetic mobility model, not that it holds for every real one.
+
 
 ---
 
@@ -251,7 +270,7 @@ Two observations. Under mobility, error does not decrease monotonically with the
 
 **Synthetic spatial structure over real speeds.** The speed *values* are real NYC TLC records, but their spatial arrangement comes from a modelled congestion field (centre-slow, periphery-fast) rather than from real per-zone speeds, because the public trip records do not carry the per-zone traces this would require. The congestion gradient is a plausible but stylized model, and results would change under a different spatial structure — for example a corridor pattern rather than a radial one.
 
-**Mobility model.** Vehicles follow a reflected random walk at their observed speed, not a road network. Real vehicles are constrained to streets, turn at intersections, and cluster at signals, which would make region membership more persistent than in our model and probably reduce the re-initialization cost that Section VI-F identifies as dominant. A road-constrained mobility trace is the single most valuable improvement to this evaluation.
+**Mobility model.** Every headline result (Sections VI-A through VI-I) uses a reflected random walk at each vehicle's observed speed, not a road network. Section VI-J checks the main finding against a real NYC street network at N = 1000 and confinement's advantage survives; adaptive region management, however, goes from indistinguishable-from-free to a measurable liability under real streets, which argues against it more strongly than the random-walk result alone does — see VI-J. That check covers one real street layout and 5 trials, not a sweep of layouts, and still ignores signals, turn restrictions, and lane-level behaviour that would make region membership more persistent still and probably reduce the re-initialization cost Section VI-F identifies as dominant. A sweep over several real neighbourhoods, and turn behaviour informed by actual signal timing, remain the most valuable next improvement to this evaluation.
 
 **Scale.** We test up to N = 1000 vehicles in a 1000 m square. This is a dense downtown district, not a city, and the conclusions about the sparse regime depend on vehicles-per-cell rather than on N alone. Results should be read against the density ratio N/G², not the fleet size.
 
@@ -280,4 +299,5 @@ All in `results/figures/`, regenerated by `python3 src/gwg_simulation.py`.
 - **fig8_av_readiness.png** — Error available within a V2X decision deadline.
 - **fig9_mobility.png** — Static versus mobile networks.
 - **fig10_restart_interval.png** — Push-sum restart interval sweep.
+- **fig11_road_mobility.png** — Random-walk versus real-street-network mobility, at matched fleet size.
 

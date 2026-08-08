@@ -33,10 +33,13 @@ Source: `results/results.json` (seed 42, 10 trials, 150 rounds).
 | Mobility degradation, Adaptive-GWG | 7.55% → 9.10% | `mobility.static/mobile.adaptive_gwg.macro_mape` |
 | Churn degradation, Adaptive-GWG | 9.10% → 15.29% | `churn.*.adaptive_gwg.macro_mape` |
 | Best threshold setting | n_min=2, n_max=20 → 8.71% | `threshold_sensitivity` |
+| Road network scale | 811 nodes, 873 edges | `config.road_network_nodes`, `.road_network_edges` |
+| Gain from confinement, N=1000, road-constrained | +33.5% | derived from `road_mobility.1000` |
+| Gain from adaptation, N=1000, road-constrained | -22.1% | derived from `road_mobility.1000` |
 
 ## Properties enforced by tests
 
-`tests/test_gwg.py` — 25 tests. Those that encode a defect found by the audit of the earlier harness:
+`tests/test_gwg.py` — 30 tests. Those that encode a defect found by the audit of the earlier harness:
 
 - `test_push_sum_is_directional` — the exchange must not be symmetric
 - `test_push_sum_conserves_mass` — the convergence guarantee rests on this
@@ -48,3 +51,4 @@ Source: `results/results.json` (seed 42, 10 trials, 150 rounds).
 - `test_non_converging_runs_are_not_averaged_in` — censored runs are counted, not averaged
 - `test_different_seeds_give_different_fleets` — trials must be independent replicates
 - `test_singleton_regions_are_excluded` — a one-vehicle average is trivially exact
+- `test_road_constrained_vehicles_stay_on_the_network` — road-constrained position must always equal the recorded edge and progress

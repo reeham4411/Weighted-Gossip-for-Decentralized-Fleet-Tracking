@@ -168,6 +168,16 @@ AV_USABLE_MAPE_PCT = 10.0
 OUT_DIR = "results/figures"
 RESULTS_DIR = "results"
 DATA_PATH = "data/processed/nyc_speeds.npy"
+ROAD_NETWORK_PATH = "data/processed/road_network.json"
+
+# Road-constrained mobility robustness check (run_road_mobility_comparison).
+# Smaller trial count and a single fleet size than the headline TRIALS=10 /
+# NODE_COUNTS: this sweep exists to check whether the confinement finding is
+# an artefact of the random-walk mobility model, not to re-establish
+# statistical power the main experiment already has. N=1000 is the density
+# where the headline result is reported.
+ROAD_MOBILITY_NODE_COUNTS = [1000]
+ROAD_MOBILITY_TRIALS = 5
 
 MPH_TO_MPS = 0.44704
 
@@ -219,6 +229,16 @@ def _load_speeds(path=DATA_PATH):
     return np.load(path)
 
 
+def _load_road_network(path=ROAD_NETWORK_PATH):
+    if not os.path.exists(path):
+        raise FileNotFoundError(
+            f"Could not find '{path}'. Run 'python3 src/extract_roads.py' from "
+            f"the repo root first (see README.md) -- it fetches a real NYC "
+            f"street network via OSM and writes this file."
+        )
+    return RoadNetwork(path)
+
+
 # ---------------------------------------------------------------------------
 # FLEET
 # ---------------------------------------------------------------------------
@@ -238,6 +258,72 @@ def congestion_factor(cell_x, cell_y):
     return 0.7 + 0.6 * min(d / max_d, 1.0)
 
 
+class RoadNetwork:
+    """
+    Lightweight loader for the cached OSM extract (src/extract_roads.py writes
+    it; this class never imports osmnx). Node ids from the JSON are remapped
+    to dense integer indices for array-friendly lookups; adjacency is a
+    per-node list of (neighbour_index, edge_length_m) so a vehicle reaching a
+    node can pick its next edge in O(degree) rather than scanning every edge.
+    """
+
+    def __init__(self, path):
+        with open(path) as f:
+            raw = json.load(f)
+
+        ids = list(raw["nodes"].keys())
+        self.index_of = {node_id: i for i, node_id in enumerate(ids)}
+        self.positions = np.array(
+            [raw["nodes"][node_id] for node_id in ids], dtype=np.float64
+        )
+        self.n_nodes = len(ids)
+
+        self.adjacency = [[] for _ in range(self.n_nodes)]
+        self.edges = []  # flat (u, v, length) for uniform initial edge sampling
+        for u_id, v_id, length in raw["edges"]:
+            u, v = self.index_of[u_id], self.index_of[v_id]
+            self.adjacency[u].append((v, length))
+            self.adjacency[v].append((u, length))
+            self.edges.append((u, v, length))
+
+    def random_edge_positions(self, n, rng):
+        """A uniformly random edge and a uniformly random point along it, for
+        initial vehicle placement (and respawning churned-out vehicles)."""
+        choices = rng.integers(0, len(self.edges), n)
+        from_idx = np.empty(n, dtype=np.int64)
+        to_idx = np.empty(n, dtype=np.int64)
+        lengths = np.empty(n, dtype=np.float64)
+        flip = rng.random(n) < 0.5
+        for i, c in enumerate(choices):
+            u, v, length = self.edges[c]
+            if flip[i]:
+                u, v = v, u
+            from_idx[i] = u
+            to_idx[i] = v
+            lengths[i] = length
+        progress = rng.uniform(0.0, lengths)
+        return from_idx, to_idx, lengths, progress
+
+    def xy(self, from_idx, to_idx, lengths, progress):
+        frac = np.divide(progress, lengths, out=np.zeros_like(progress),
+                         where=lengths > 0)
+        p0 = self.positions[from_idx]
+        p1 = self.positions[to_idx]
+        return (p0[:, 0] + frac * (p1[:, 0] - p0[:, 0]),
+                p0[:, 1] + frac * (p1[:, 1] - p0[:, 1]))
+
+    def next_edge(self, arriving_at, came_from, rng):
+        """Which node to head toward after reaching `arriving_at`, having just
+        come from `came_from`. Excludes an immediate U-turn unless the node is
+        a dead end (its only edge is the one just traversed)."""
+        neighbours = self.adjacency[arriving_at]
+        options = [(v, length) for v, length in neighbours if v != came_from]
+        if not options:
+            options = neighbours
+        v, length = options[rng.integers(0, len(options))]
+        return v, length
+
+
 class Fleet:
     """
     Array-backed fleet state. Held as parallel numpy arrays rather than objects
@@ -245,13 +331,21 @@ class Fleet:
     independent trials of every protocol.
     """
 
-    def __init__(self, n, speed_pool, rng):
+    def __init__(self, n, speed_pool, rng, road_network=None):
         self.n = n
         self.rng = rng
         self.speed_pool = speed_pool
+        self.road_network = road_network
 
-        self.x = rng.uniform(0.0, AREA_M, n)
-        self.y = rng.uniform(0.0, AREA_M, n)
+        if road_network is not None:
+            (self.road_from, self.road_to,
+             self.road_edge_len, self.road_progress) = \
+                road_network.random_edge_positions(n, rng)
+            self.x, self.y = road_network.xy(
+                self.road_from, self.road_to, self.road_edge_len, self.road_progress)
+        else:
+            self.x = rng.uniform(0.0, AREA_M, n)
+            self.y = rng.uniform(0.0, AREA_M, n)
         self.heading = rng.uniform(0.0, 2 * math.pi, n)
 
         # Each vehicle carries a base draw from the real NYC speed distribution;
@@ -303,6 +397,12 @@ class Fleet:
         """Advance one round of driving."""
         if not MOBILITY_ENABLED:
             return
+        if self.road_network is not None:
+            self._step_mobility_road()
+        else:
+            self._step_mobility_random_walk()
+
+    def _step_mobility_random_walk(self):
         self.heading += self.rng.normal(0.0, HEADING_JITTER_RAD, self.n)
         dist = self.true_speed * MPH_TO_MPS * ROUND_DURATION_S
         self.x += dist * np.cos(self.heading)
@@ -314,6 +414,40 @@ class Fleet:
         off = (self.x <= 0.0) | (self.x >= AREA_M) | (self.y <= 0.0) | (self.y >= AREA_M)
         if off.any():
             self.heading[off] += math.pi
+
+    def _step_mobility_road(self):
+        """
+        Advance each vehicle along its current street edge; on reaching a
+        node, turn onto a new edge (never straight back the way it came,
+        unless that node is a dead end) and continue with the leftover
+        distance. Vectorized for the common case (still mid-edge); only the
+        vehicles that actually cross a node this round need the per-vehicle
+        graph lookup, and one round's travel (a few metres at most, even at
+        70 mph) is almost always far short of a city block, so this loop
+        resolves in one or two passes.
+        """
+        remaining = self.true_speed * MPH_TO_MPS * ROUND_DURATION_S
+        for _ in range(8):
+            self.road_progress += remaining
+            remaining = np.zeros(self.n, dtype=np.float64)
+            overflow = self.road_progress - self.road_edge_len
+            crossing = np.where(overflow > 0)[0]
+            if crossing.size == 0:
+                break
+            for i in crossing:
+                leftover = float(overflow[i])
+                arrived_at = int(self.road_to[i])
+                came_from = int(self.road_from[i])
+                next_to, next_len = self.road_network.next_edge(
+                    arrived_at, came_from, self.rng)
+                self.road_from[i] = arrived_at
+                self.road_to[i] = next_to
+                self.road_edge_len[i] = next_len
+                self.road_progress[i] = 0.0
+                remaining[i] = leftover
+        np.clip(self.road_progress, 0.0, self.road_edge_len, out=self.road_progress)
+        self.x, self.y = self.road_network.xy(
+            self.road_from, self.road_to, self.road_edge_len, self.road_progress)
 
     def step_churn(self, churn_rate):
         """
@@ -328,9 +462,17 @@ class Fleet:
         leaving = np.where(self.rng.random(self.n) < churn_rate)[0]
         if leaving.size == 0:
             return 0
-        self.x[leaving] = self.rng.uniform(0.0, AREA_M, leaving.size)
-        self.y[leaving] = self.rng.uniform(0.0, AREA_M, leaving.size)
-        self.heading[leaving] = self.rng.uniform(0.0, 2 * math.pi, leaving.size)
+        if self.road_network is not None:
+            f, t, l, p = self.road_network.random_edge_positions(leaving.size, self.rng)
+            self.road_from[leaving] = f
+            self.road_to[leaving] = t
+            self.road_edge_len[leaving] = l
+            self.road_progress[leaving] = p
+            self.x[leaving], self.y[leaving] = self.road_network.xy(f, t, l, p)
+        else:
+            self.x[leaving] = self.rng.uniform(0.0, AREA_M, leaving.size)
+            self.y[leaving] = self.rng.uniform(0.0, AREA_M, leaving.size)
+            self.heading[leaving] = self.rng.uniform(0.0, 2 * math.pi, leaving.size)
         self.base_speed[leaving] = self.rng.choice(self.speed_pool, leaving.size)
         self.refresh_true_speed()
         self.reset_estimates(leaving)
@@ -668,7 +810,7 @@ def error_metrics(estimates, true_speed, partition):
 def run_once(protocol, n, speed_pool, seed,
              max_rounds=MAX_ROUNDS, churn_rate=CHURN_RATE,
              mobility=None, min_nodes=None, max_nodes=None,
-             refresh_rounds=None, restart_interval=None):
+             refresh_rounds=None, restart_interval=None, road_network=None):
     """
     Run one protocol on one independently generated fleet.
 
@@ -688,7 +830,7 @@ def run_once(protocol, n, speed_pool, seed,
 
     try:
         rng = np.random.default_rng(seed)
-        fleet = Fleet(n, speed_pool, rng)
+        fleet = Fleet(n, speed_pool, rng, road_network=road_network)
 
         buckets, cells = build_spatial_buckets(fleet)
         if protocol == "adaptive_gwg":
@@ -878,7 +1020,7 @@ def summarize(runs):
 
 def run_main_experiment(speed_pool, trials=TRIALS, node_counts=None,
                         churn_rate=CHURN_RATE, mobility=True, tag="main",
-                        restart_interval=None):
+                        restart_interval=None, road_network=None):
     node_counts = node_counts or NODE_COUNTS
     out = {}
     for n in node_counts:
@@ -891,7 +1033,8 @@ def run_main_experiment(speed_pool, trials=TRIALS, node_counts=None,
                 runs.append(run_once(proto, n, speed_pool,
                                      seed=RANDOM_SEED + 1000 * t,
                                      churn_rate=churn_rate, mobility=mobility,
-                                     restart_interval=restart_interval))
+                                     restart_interval=restart_interval,
+                                     road_network=road_network))
             out[n][proto] = summarize(runs)
             s = out[n][proto]
             conv = (f"{s['median_convergence_round']:.0f}"
@@ -1023,6 +1166,25 @@ def run_restart_sweep(speed_pool, n=500, intervals=(0, 5, 10, 20, 50), trials=5)
     return out
 
 
+def run_road_mobility_comparison(speed_pool, road_network,
+                                 node_counts=None, trials=None):
+    """
+    Robustness check, not a replacement for the main experiment: rerun the
+    same four-protocol comparison with vehicles constrained to a real NYC
+    street network (src/extract_roads.py) instead of the random-walk mobility
+    model used everywhere else, and report whether region confinement still
+    explains the improvement. Region assignment, radio range and the
+    congestion field are unchanged -- only how vehicles move through the same
+    service area changes.
+    """
+    node_counts = node_counts or ROAD_MOBILITY_NODE_COUNTS
+    trials = trials or ROAD_MOBILITY_TRIALS
+    print("\n>>> Road-constrained mobility robustness check", flush=True)
+    return run_main_experiment(speed_pool, trials=trials, node_counts=node_counts,
+                               churn_rate=0.0, mobility=True, tag="road",
+                               road_network=road_network)
+
+
 def compute_av_readiness(main):
     """
     Reframe the convergence curves against a V2X latency budget: at 100 ms per
@@ -1097,6 +1259,32 @@ def print_attribution(main):
     print("Only the second column is evidence for the paper's contribution (1).")
 
 
+def print_road_mobility_comparison(main, road_mobility):
+    """
+    Does the confinement finding hold up off the random-walk mobility model?
+    Same attribution question as print_attribution, computed on the
+    road-constrained run and set beside the random-walk numbers at matched N.
+    """
+    print("\n" + "=" * 92)
+    print("ROAD-CONSTRAINED MOBILITY ROBUSTNESS CHECK  (macro MAPE, lower is better)")
+    print("=" * 92)
+    print(f"{'N':>5} | {'mobility':>9} | {'Fixed GWG':>10} | {'+confined':>10} | "
+          f"{'+adaptive':>10} | {'gain: confine':>14} | {'gain: adapt':>12}")
+    print("-" * 92)
+    for n in sorted(road_mobility):
+        for label, results in (("random-walk", main), ("road net", road_mobility)):
+            f = results[n]["fixed_gwg"]["macro_mape"]
+            c = results[n]["fixed_confined"]["macro_mape"]
+            a = results[n]["adaptive_gwg"]["macro_mape"]
+            g1 = (f - c) / f * 100 if f else 0.0
+            g2 = (c - a) / c * 100 if c else 0.0
+            print(f"{n:>5} | {label:>9} | {f:>9.2f}% | {c:>9.2f}% | {a:>9.2f}% | "
+                  f"{g1:>13.1f}% | {g2:>11.1f}%")
+    print("-" * 92)
+    print("If 'gain: confine' stays large and positive under a real street network,")
+    print("the headline finding is not an artefact of the random-walk mobility model.")
+
+
 def print_av_readiness(av):
     print("\n" + "=" * 92)
     print("AV REAL-TIME READINESS")
@@ -1159,7 +1347,8 @@ def _bars(ax, node_counts, values, errs=None):
     _style(ax)
 
 
-def make_figures(main, churn, mobility, sensitivity, av, restart, out_dir=OUT_DIR):
+def make_figures(main, churn, mobility, sensitivity, av, restart,
+                 road_mobility=None, out_dir=OUT_DIR):
     if plt is None:
         print(f"\nFigures skipped, matplotlib unavailable: {MATPLOTLIB_IMPORT_ERROR}")
         return []
@@ -1343,6 +1532,33 @@ def make_figures(main, churn, mobility, sensitivity, av, restart, out_dir=OUT_DI
     _style(ax)
     save(fig, "fig9_mobility.png")
 
+    # Fig 11 -- random-walk vs. road-constrained mobility, at matched N.
+    if road_mobility:
+        fig, ax = plt.subplots(figsize=(6.0, 3.6))
+        rn = sorted(road_mobility)
+        x = np.arange(len(rn))
+        w = 0.2
+        for k, proto in enumerate(PROTOCOLS):
+            vals = [main[n][proto]["macro_mape"] for n in rn]
+            errs = [main[n][proto]["macro_mape_ci95"] for n in rn]
+            ax.bar(x + (k - 1.5) * (w + 0.02) - 0.42, vals, w, yerr=errs, capsize=3,
+                   color=PROTOCOL_COLORS[proto], alpha=0.45,
+                   edgecolor="white", linewidth=1.2)
+        for k, proto in enumerate(PROTOCOLS):
+            vals = [road_mobility[n][proto]["macro_mape"] for n in rn]
+            errs = [road_mobility[n][proto]["macro_mape_ci95"] for n in rn]
+            ax.bar(x + (k - 1.5) * (w + 0.02) + 0.42, vals, w, yerr=errs, capsize=3,
+                   color=PROTOCOL_COLORS[proto], label=PROTOCOL_LABELS[proto],
+                   edgecolor="white", linewidth=1.2)
+        ax.set_xticks(x)
+        ax.set_xticklabels([f"N={n}" for n in rn])
+        ax.set_ylabel("Final per-region MAPE  %")
+        ax.set_title("Random-walk (left, faded) vs. real-street mobility (right), 95% CI",
+                     fontweight="bold")
+        ax.legend(frameon=False, fontsize=8)
+        _style(ax)
+        save(fig, "fig11_road_mobility.png")
+
     return saved
 
 
@@ -1379,15 +1595,18 @@ def main():
     refresh_results = run_refresh_sweep(pool)
     restart_results = run_restart_sweep(pool)
     av = compute_av_readiness(main_results)
+    road_network = _load_road_network()
+    road_mobility_results = run_road_mobility_comparison(pool, road_network)
 
     print_main_table(main_results)
     print_attribution(main_results)
+    print_road_mobility_comparison(main_results, road_mobility_results)
     print_av_readiness(av)
     print_amdahl_analysis()
 
     print("\n>>> Figures", flush=True)
     make_figures(main_results, churn_results, mobility_results, sensitivity_results,
-                 av, restart_results)
+                 av, restart_results, road_mobility=road_mobility_results)
 
     os.makedirs(RESULTS_DIR, exist_ok=True)
     payload = {
@@ -1403,6 +1622,10 @@ def main():
             "dataset_samples": int(len(speeds)),
             "dataset_mean_mph": float(speeds.mean()),
             "dataset_std_mph": float(speeds.std()),
+            "road_mobility_node_counts": ROAD_MOBILITY_NODE_COUNTS,
+            "road_mobility_trials": ROAD_MOBILITY_TRIALS,
+            "road_network_nodes": road_network.n_nodes,
+            "road_network_edges": len(road_network.edges),
         },
         "main": {str(k): v for k, v in main_results.items()},
         "churn": {str(k): v for k, v in churn_results.items()},
@@ -1410,6 +1633,7 @@ def main():
         "threshold_sensitivity": sensitivity_results,
         "refresh_sweep": refresh_results,
         "restart_sweep": restart_results,
+        "road_mobility": {str(k): v for k, v in road_mobility_results.items()},
         "av_readiness": {str(k): {p: {str(b): d for b, d in row.items()}
                                   for p, row in v.items()} for k, v in av.items()},
     }
