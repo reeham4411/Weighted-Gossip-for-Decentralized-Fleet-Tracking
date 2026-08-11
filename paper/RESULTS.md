@@ -9,8 +9,6 @@ Vehicle speeds are drawn from real New York City Taxi and Limousine Commission Y
 
 The coefficient of variation of roughly 0.54 is the reason this problem is not trivial: an unaveraged single reading is already about 54% away from its regional mean in expectation, so a protocol that fails to average has a characteristic error signature we can recognize in the results.
 
-We deliberately report the year of the data rather than inheriting it from an earlier draft: an internal review of this project found a draft citing a 2013 dataset while the experiments used a different period, and we note it here so the provenance is unambiguous.
-
 ### B. Simulation Parameters
 
 | Parameter | Value |
@@ -90,7 +88,7 @@ Fig. 3 shows the same decomposition graphically.
 | 500 | 20.92% | 8.91% | 9.20% | +57.4% | -3.3% |
 | 1000 | 17.39% | 9.03% | 9.04% | +48.1% | -0.2% |
 
-**Region confinement accounts for the entire improvement.** Restricting peer selection to the sender's own cell — a one-line change to the fixed-grid baseline — is worth +9.9% at N=100 (1 vehicles/cell), +57.4% at N=500 (5 vehicles/cell), +48.1% at N=1000 (10 vehicles/cell).
+**Region confinement accounts for the entire improvement.** Restricting peer selection to the sender's own cell — a one-line change to the fixed-grid baseline — is worth +9.9% at N=100 (1 vehicle/cell), +57.4% at N=500 (5 vehicles/cell), +48.1% at N=1000 (10 vehicles/cell).
 
 **Adaptive region management adds nothing measurable on top of it:** -0.1% at N=100, -3.3% at N=500, -0.2% at N=1000. Every one of these is negative or negligible.
 
@@ -231,7 +229,7 @@ This bears directly on an obvious confound: that Adaptive-GWG might win merely b
 
 ### I. Real-Time Readiness for AV Consumers
 
-Treating one round as one 100 ms beacon interval [23], [24], Table VIII reports the error a protocol would hand a decision system at a given deadline. 'Usable' is macro MAPE ≤ 10%, an illustrative threshold for cooperative speed advisory rather than one derived from a standard.
+Treating one round as one 100 ms beacon interval [23], [24], Table IX reports the error a protocol would hand a decision system at a given deadline. 'Usable' is macro MAPE ≤ 10%, an illustrative threshold for cooperative speed advisory rather than one derived from a standard.
 
 Fig. 8 plots error against the decision deadline.
 

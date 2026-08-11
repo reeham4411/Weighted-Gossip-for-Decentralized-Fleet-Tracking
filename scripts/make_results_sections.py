@@ -79,10 +79,6 @@ def main():
       f"{cfg['dataset_std_mph']/cfg['dataset_mean_mph']*100:.0f}% away from its regional "
       "mean in expectation, so a protocol that fails to average has a characteristic "
       "error signature we can recognize in the results.\n")
-    w("We deliberately report the year of the data rather than inheriting it from an "
-      "earlier draft: an internal review of this project found a draft citing a 2013 "
-      "dataset while the experiments used a different period, and we note it here so "
-      "the provenance is unambiguous.\n")
 
     w("### B. Simulation Parameters\n")
     w("| Parameter | Value |")
@@ -190,8 +186,13 @@ def main():
     adapt_gains = [pct(main_r[n]["fixed_confined"]["macro_mape"],
                        main_r[n]["adaptive_gwg"]["macro_mape"]) for n in sizes]
 
+    def _density_str(n):
+        density = n / cells_total
+        unit = "vehicle" if abs(density - 1) < 1e-9 else "vehicles"
+        return "{:.0f} {}/cell".format(density, unit)
+
     confine_str = ", ".join(
-        "{:+.1f}% at N={} ({:.0f} vehicles/cell)".format(g, n, n / cells_total)
+        "{:+.1f}% at N={} ({})".format(g, n, _density_str(n))
         for g, n in zip(confine_gains, sizes))
     adapt_str = ", ".join("{:+.1f}% at N={}".format(g, n)
                           for g, n in zip(adapt_gains, sizes))
@@ -525,7 +526,7 @@ def main():
 
     w("### I. Real-Time Readiness for AV Consumers\n")
     w(f"Treating one round as one {cfg['round_duration_s']*1000:.0f} ms beacon interval "
-      f"[23], [24], Table VIII reports the error a protocol would hand a decision system "
+      f"[23], [24], Table IX reports the error a protocol would hand a decision system "
       f"at a given deadline. 'Usable' is macro MAPE ≤ 10%, an illustrative threshold for "
       f"cooperative speed advisory rather than one derived from a standard.\n")
     w("Fig. 8 plots error against the decision deadline.\n")
