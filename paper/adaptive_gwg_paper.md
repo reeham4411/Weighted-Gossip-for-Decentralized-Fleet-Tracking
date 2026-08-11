@@ -1,4 +1,4 @@
-# What Actually Makes Geo-Weighted Gossip Regional: An Ablation of Region-Aware Push-Sum for Vehicular Networks
+# Region-Constrained Geo-Weighted Push-Sum Gossip for Distributed Traffic Estimation in Mobile Vehicular Networks
 
 **Fatima Ali**, **Asma Imran**, **Adeena Reeham**
 School of Electrical Engineering and Computer Science
@@ -13,10 +13,12 @@ National University of Sciences and Technology, Islamabad, Pakistan
 > **Title decided.** The paper previously ran under *Adaptive Region-Aware Geo-Weighted
 > Push-Sum Gossip for Highly Mobile Vehicular Networks*, which names the adaptive layer as
 > the contribution — a claim Section VI-B does not support, since the improvement belongs
-> to region confinement, with adaptation contributing nothing measurable. The team has
-> settled on the title above, which matches the finding and frames the ablation as the
-> contribution it is. It also fits a reproducibility or measurement-focused venue better,
-> where a well-controlled negative result is the point rather than a disappointment.
+> to region confinement, with adaptation contributing nothing measurable. An interim title,
+> *What Actually Makes Geo-Weighted Gossip Regional*, fixed that but read more like an
+> internal memo than a paper title. The team has settled on the title above, which matches
+> the finding, names the mechanism that actually does the work (region confinement) instead
+> of the one that doesn't (adaptation), and fits a submission venue's expectations better
+> than either earlier option.
 
 ---
 
@@ -698,3 +700,5 @@ Applications; Part 2: Specification of Cooperative Awareness Basic Service," ETS
 637-2 V1.4.1, 2019.
 
 [24] SAE International, "V2X Communications Message Set Dictionary," SAE J2735, 2020.
+
+[25] OpenStreetMap contributors, "Overpass API." [Online]. Available: https://overpass-api.de/
