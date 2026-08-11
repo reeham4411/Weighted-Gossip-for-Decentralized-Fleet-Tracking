@@ -23,12 +23,58 @@ import sys
 SRC = "paper/adaptive_gwg_paper.md"
 RESULTS = "paper/RESULTS.md"
 OUT = "paper/FULL_PAPER.md"
+FIGURES_DIR = "results/figures"
 
 # The placeholder block that RESULTS.md replaces.
 PLACEHOLDER = re.compile(
     r"## V\. Experimental Setup.*?(?=\n---\n\n## VIII\. Conclusion)",
     re.DOTALL,
 )
+
+# Matches the caption list entries under "## Figures", e.g.
+# "- **fig3_attribution.png** — Contribution attribution: ..."
+FIGURE_ENTRY = re.compile(r"^- \*\*(fig(\d+)_\S+\.png)\*\* — (.+)$", re.MULTILINE)
+
+
+def embed_figures(full):
+    """Inline each figure as an image right after its first "Fig. N" mention.
+
+    RESULTS.md only lists figures by filename and caption in a trailing
+    "## Figures" section; nothing upstream of that point ever shows the
+    reader an actual image. This finds the first paragraph that names each
+    figure ("Fig. 3 shows the same decomposition graphically.") and inserts
+    the image plus its caption right after that paragraph, in reading order,
+    so the assembled paper carries its own figures instead of only
+    describing where to find them.
+    """
+    figures_heading = full.find("\n## Figures\n")
+    if figures_heading == -1:
+        return full
+    body, tail = full[:figures_heading], full[figures_heading:]
+
+    captions = {
+        int(num): (fname, caption.strip())
+        for fname, num, caption in FIGURE_ENTRY.findall(tail)
+    }
+    if not captions:
+        return full
+
+    paragraphs = body.split("\n\n")
+    inserted = set()
+    out_paragraphs = []
+    for para in paragraphs:
+        out_paragraphs.append(para)
+        for n in sorted(set(int(m) for m in re.findall(r"Fig\.\s(\d+)", para))):
+            if n in inserted or n not in captions:
+                continue
+            fname, caption = captions[n]
+            path = os.path.join(FIGURES_DIR, fname)
+            if not os.path.exists(path):
+                continue
+            out_paragraphs.append(f"![Fig. {n}. {caption}]({path})")
+            out_paragraphs.append(f"*Fig. {n}. {caption}*")
+            inserted.add(n)
+    return "\n\n".join(out_paragraphs) + tail
 
 
 def main():
@@ -54,6 +100,8 @@ def main():
     # part of the paper a reviewer should see.
     full = re.sub(r"^> \*\*Status\.\*\*.*?(?=\n---\n)", "", full,
                   flags=re.DOTALL | re.MULTILINE)
+
+    full = embed_figures(full)
 
     with open(OUT, "w") as fh:
         fh.write(full)

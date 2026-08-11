@@ -1,4 +1,4 @@
-# What Actually Makes Geo-Weighted Gossip Regional: An Ablation of Region-Aware Push-Sum for Vehicular Networks
+# Region-Constrained Geo-Weighted Push-Sum Gossip for Distributed Traffic Estimation in Mobile Vehicular Networks
 
 **Fatima Ali**, **Asma Imran**, **Adeena Reeham**
 School of Electrical Engineering and Computer Science
@@ -558,6 +558,14 @@ Table II reports all four protocols at each fleet size, with mobility enabled an
 
 Fig. 1 plots the convergence curves and Fig. 2 the final accuracy with intervals.
 
+![Fig. 1. Convergence of the per-region estimate, one panel per fleet size.](results/figures/fig1_convergence_curves.png)
+
+*Fig. 1. Convergence of the per-region estimate, one panel per fleet size.*
+
+![Fig. 2. Steady-state per-region MAPE with 95% CI.](results/figures/fig2_final_mape.png)
+
+*Fig. 2. Steady-state per-region MAPE with 95% CI.*
+
 **TABLE II. MAIN RESULTS (mobility on, no churn, 95% CI)**
 
 | N | Protocol | Macro MAPE % | Micro MAPE % | Converged | Hop (m) | B/vehicle | Cross-region % |
@@ -583,6 +591,10 @@ This is the question the ablation exists to answer, and it is the one prior work
 
 Fig. 3 shows the same decomposition graphically.
 
+![Fig. 3. Contribution attribution: what region confinement buys versus what adaptive region management adds on top of it.](results/figures/fig3_attribution.png)
+
+*Fig. 3. Contribution attribution: what region confinement buys versus what adaptive region management adds on top of it.*
+
 **TABLE III. CONTRIBUTION ATTRIBUTION (macro MAPE)**
 
 | N | Fixed GWG | + region confinement | + adaptive regions | Gain from confinement | Gain from adaptation |
@@ -596,6 +608,10 @@ Fig. 3 shows the same decomposition graphically.
 **Adaptive region management adds nothing measurable on top of it:** -0.1% at N=100, -3.3% at N=500, -0.2% at N=1000. Every one of these is negative or negligible.
 
 Fig. 12 plots this test as a forest plot, alongside its road-constrained counterpart from Section VI-J.
+
+![Fig. 12. Paired significance test (Table III-A) for the adaptation question, plotted as a forest plot of the paired difference and its 95% CI at every fleet size and mobility model tested.](results/figures/fig12_paired_significance.png)
+
+*Fig. 12. Paired significance test (Table III-A) for the adaptation question, plotted as a forest plot of the paired difference and its 95% CI at every fleet size and mobility model tested.*
 
 **TABLE III-A. PAIRED SIGNIFICANCE TEST (adaptive_gwg − fixed_confined, macro MAPE points)**
 
@@ -629,6 +645,14 @@ Adaptive-GWG is not free. At N = 1000 it sends **6312 B per vehicle** against **
 
 Fig. 4 reports mean hop distance and Fig. 5 the communication cost including control traffic.
 
+![Fig. 4. Mean geographic distance per gossip exchange.](results/figures/fig4_hop_distance.png)
+
+*Fig. 4. Mean geographic distance per gossip exchange.*
+
+![Fig. 5. Bytes per vehicle, including region-management control traffic.](results/figures/fig5_communication_cost.png)
+
+*Fig. 5. Bytes per vehicle, including region-management control traffic.*
+
 **TABLE IV. REGION-REFRESH INTERVAL (N = 500)**
 
 | τ (rounds) | Macro MAPE % | Control messages | B/vehicle |
@@ -652,6 +676,10 @@ The remedy is standard for push-sum over time-varying data: restart the accumula
 
 Fig. 10 plots the sweep.
 
+![Fig. 10. Push-sum restart interval sweep.](results/figures/fig10_restart_interval.png)
+
+*Fig. 10. Push-sum restart interval sweep.*
+
 **TABLE V. PUSH-SUM RESTART INTERVAL (N = 500, steady-state macro MAPE %)**
 
 | Restart interval | Uniform Random Gossip | Fixed GWG | Fixed GWG (region-confined) | Adaptive-GWG |
@@ -669,6 +697,10 @@ The most informative column is the leftmost. Uniform Random Gossip and Fixed GWG
 ### F. Mobility
 
 Fig. 9 shows the same comparison.
+
+![Fig. 9. Static versus mobile networks.](results/figures/fig9_mobility.png)
+
+*Fig. 9. Static versus mobile networks.*
 
 **TABLE VI. STATIC VS MOBILE (N = 500)**
 
@@ -689,6 +721,10 @@ We note that Adaptive-GWG is **behind** the confined baseline in both conditions
 
 Fig. 6 plots error against churn rate.
 
+![Fig. 6. Error against per-round churn rate.](results/figures/fig6_churn.png)
+
+*Fig. 6. Error against per-round churn rate.*
+
 **TABLE VII. PER-ROUND CHURN (N = 500)**
 
 | Churn ρ | Uniform Random Gossip | Fixed GWG | Fixed GWG (region-confined) | Adaptive-GWG |
@@ -706,6 +742,10 @@ The ordering between protocols is preserved at every churn rate tested, with Ada
 ### H. Sensitivity to the Adaptive Thresholds
 
 Fig. 7 plots the sweep.
+
+![Fig. 7. Merge/split threshold sweep.](results/figures/fig7_threshold_sensitivity.png)
+
+*Fig. 7. Merge/split threshold sweep.*
 
 **TABLE VIII. MERGE/SPLIT THRESHOLD SWEEP (N = 500)**
 
@@ -736,6 +776,10 @@ Treating one round as one 100 ms beacon interval [23], [24], Table VIII reports 
 
 Fig. 8 plots error against the decision deadline.
 
+![Fig. 8. Error available within a V2X decision deadline.](results/figures/fig8_av_readiness.png)
+
+*Fig. 8. Error available within a V2X decision deadline.*
+
 **TABLE IX. ERROR AT A DECISION DEADLINE (macro MAPE %)**
 
 | N | Protocol | 0.5 s | 1.0 s | 2.0 s | 5.0 s |
@@ -757,9 +801,13 @@ Two observations. Under mobility, error does not decrease monotonically with the
 
 ### J. Robustness to Road-Constrained Mobility
 
-Every result above uses a reflected random walk: a plausible but synthetic mobility model, and the one caveat reviewers of this line of work raise most often. To check whether the confinement finding is an artefact of that choice, we rerun the same four-protocol comparison with vehicles confined to a real NYC street network (811 intersections, 873 street segments, fetched via OpenStreetMap for a block the same size as the service area) instead of moving freely: a vehicle drives along its current street and turns only at an intersection. Region assignment, radio range, and the congestion field are unchanged — only how vehicles move through the same square changes.
+Every result above uses a reflected random walk: a plausible but synthetic mobility model, and the one caveat reviewers of this line of work raise most often. To check whether the confinement finding is an artefact of that choice, we rerun the same four-protocol comparison with vehicles confined to a real NYC street network (811 intersections, 873 street segments, fetched via OpenStreetMap [25] for a block the same size as the service area) instead of moving freely: a vehicle drives along its current street and turns only at an intersection. Region assignment, radio range, and the congestion field are unchanged — only how vehicles move through the same square changes.
 
 Fig. 11 plots both mobility models side by side.
+
+![Fig. 11. Random-walk versus real-street-network mobility, at matched fleet size.](results/figures/fig11_road_mobility.png)
+
+*Fig. 11. Random-walk versus real-street-network mobility, at matched fleet size.*
 
 **TABLE X. RANDOM WALK VS. ROAD-CONSTRAINED MOBILITY (macro MAPE %, 95% CI — road-constrained rows use 5 trials, random-walk rows use 10)**
 
@@ -989,3 +1037,5 @@ Applications; Part 2: Specification of Cooperative Awareness Basic Service," ETS
 637-2 V1.4.1, 2019.
 
 [24] SAE International, "V2X Communications Message Set Dictionary," SAE J2735, 2020.
+
+[25] OpenStreetMap contributors, "Overpass API." [Online]. Available: https://overpass-api.de/
