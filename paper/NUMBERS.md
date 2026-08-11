@@ -6,40 +6,40 @@ Source: `results/results.json` (seed 42, 10 trials, 150 rounds).
 
 | Claim | Value | Evidence |
 |---|---|---|
-| Dataset size | 3,227,179 samples | `config.dataset_samples` |
-| Dataset mean / sd | 11.92 / 6.47 mph | `config.dataset_mean_mph`, `.dataset_std_mph` |
-| N=100 Uniform Random Gossip macro MAPE | 31.19 ± 4.31% | `main.100.uniform.macro_mape` |
-| N=100 Fixed GWG macro MAPE | 22.74 ± 2.22% | `main.100.fixed_gwg.macro_mape` |
-| N=100 Fixed GWG (region-confined) macro MAPE | 20.09 ± 2.28% | `main.100.fixed_confined.macro_mape` |
-| N=100 Adaptive-GWG macro MAPE | 19.66 ± 2.28% | `main.100.adaptive_gwg.macro_mape` |
-| N=500 Uniform Random Gossip macro MAPE | 24.33 ± 1.50% | `main.500.uniform.macro_mape` |
-| N=500 Fixed GWG macro MAPE | 21.02 ± 1.02% | `main.500.fixed_gwg.macro_mape` |
-| N=500 Fixed GWG (region-confined) macro MAPE | 9.08 ± 0.56% | `main.500.fixed_confined.macro_mape` |
-| N=500 Adaptive-GWG macro MAPE | 9.13 ± 0.55% | `main.500.adaptive_gwg.macro_mape` |
-| N=1000 Uniform Random Gossip macro MAPE | 20.78 ± 0.91% | `main.1000.uniform.macro_mape` |
-| N=1000 Fixed GWG macro MAPE | 17.87 ± 0.49% | `main.1000.fixed_gwg.macro_mape` |
-| N=1000 Fixed GWG (region-confined) macro MAPE | 9.39 ± 0.18% | `main.1000.fixed_confined.macro_mape` |
-| N=1000 Adaptive-GWG macro MAPE | 9.40 ± 0.18% | `main.1000.adaptive_gwg.macro_mape` |
+| Dataset size | 12,870,597 samples | `config.dataset_samples` |
+| Dataset mean / sd | 11.63 / 6.25 mph | `config.dataset_mean_mph`, `.dataset_std_mph` |
+| N=100 Uniform Random Gossip macro MAPE | 28.19 ± 3.33% | `main.100.uniform.macro_mape` |
+| N=100 Fixed GWG macro MAPE | 21.74 ± 2.09% | `main.100.fixed_gwg.macro_mape` |
+| N=100 Fixed GWG (region-confined) macro MAPE | 19.59 ± 1.93% | `main.100.fixed_confined.macro_mape` |
+| N=100 Adaptive-GWG macro MAPE | 19.60 ± 2.03% | `main.100.adaptive_gwg.macro_mape` |
+| N=500 Uniform Random Gossip macro MAPE | 23.98 ± 0.99% | `main.500.uniform.macro_mape` |
+| N=500 Fixed GWG macro MAPE | 20.92 ± 0.93% | `main.500.fixed_gwg.macro_mape` |
+| N=500 Fixed GWG (region-confined) macro MAPE | 8.91 ± 0.53% | `main.500.fixed_confined.macro_mape` |
+| N=500 Adaptive-GWG macro MAPE | 9.20 ± 0.52% | `main.500.adaptive_gwg.macro_mape` |
+| N=1000 Uniform Random Gossip macro MAPE | 20.32 ± 0.50% | `main.1000.uniform.macro_mape` |
+| N=1000 Fixed GWG macro MAPE | 17.39 ± 0.48% | `main.1000.fixed_gwg.macro_mape` |
+| N=1000 Fixed GWG (region-confined) macro MAPE | 9.03 ± 0.32% | `main.1000.fixed_confined.macro_mape` |
+| N=1000 Adaptive-GWG macro MAPE | 9.04 ± 0.33% | `main.1000.adaptive_gwg.macro_mape` |
 | Adaptive vs Uniform at N=1000 | 55% reduction | derived from `main.1000` |
-| Gain from confinement, N=100 | +11.6% | derived from `main.100` |
-| Gain from adaptation, N=100 | +2.2% | derived from `main.100` |
-| Paired significance, adaptation gain, N=100 | -0.43 ± 0.52 pts (not significant at 95%) | `ablation_significance.100.adaptation` |
-| Gain from confinement, N=500 | +56.8% | derived from `main.500` |
-| Gain from adaptation, N=500 | -0.5% | derived from `main.500` |
-| Paired significance, adaptation gain, N=500 | +0.05 ± 0.27 pts (not significant at 95%) | `ablation_significance.500.adaptation` |
-| Gain from confinement, N=1000 | +47.5% | derived from `main.1000` |
-| Gain from adaptation, N=1000 | -0.1% | derived from `main.1000` |
-| Paired significance, adaptation gain, N=1000 | +0.01 ± 0.03 pts (not significant at 95%) | `ablation_significance.1000.adaptation` |
-| Cross-region exchanges, Fixed GWG, N=1000 | 69.0% | `main.1000.fixed_gwg.cross_region_exchange_pct` |
+| Gain from confinement, N=100 | +9.9% | derived from `main.100` |
+| Gain from adaptation, N=100 | -0.1% | derived from `main.100` |
+| Paired significance, adaptation gain, N=100 | +0.02 ± 0.75 pts (not significant at 95%) | `ablation_significance.100.adaptation` |
+| Gain from confinement, N=500 | +57.4% | derived from `main.500` |
+| Gain from adaptation, N=500 | -3.3% | derived from `main.500` |
+| Paired significance, adaptation gain, N=500 | +0.29 ± 0.32 pts (not significant at 95%) | `ablation_significance.500.adaptation` |
+| Gain from confinement, N=1000 | +48.1% | derived from `main.1000` |
+| Gain from adaptation, N=1000 | -0.2% | derived from `main.1000` |
+| Paired significance, adaptation gain, N=1000 | +0.02 ± 0.03 pts (not significant at 95%) | `ablation_significance.1000.adaptation` |
+| Cross-region exchanges, Fixed GWG, N=1000 | 68.9% | `main.1000.fixed_gwg.cross_region_exchange_pct` |
 | Cross-region exchanges, Adaptive-GWG, N=1000 | 0.1% | `main.1000.adaptive_gwg.cross_region_exchange_pct` |
 | Control-traffic overhead at N=1000 | 0.2% | derived from `main.1000.*.bytes_per_node` |
-| Mobility degradation, Adaptive-GWG | 8.38% → 9.21% | `mobility.static/mobile.adaptive_gwg.macro_mape` |
-| Churn degradation, Adaptive-GWG | 9.21% → 15.44% | `churn.*.adaptive_gwg.macro_mape` |
-| Best threshold setting | n_min=2, n_max=20 → 9.17% | `threshold_sensitivity` |
+| Mobility degradation, Adaptive-GWG | 7.55% → 9.10% | `mobility.static/mobile.adaptive_gwg.macro_mape` |
+| Churn degradation, Adaptive-GWG | 9.10% → 15.29% | `churn.*.adaptive_gwg.macro_mape` |
+| Best threshold setting | n_min=2, n_max=20 → 8.71% | `threshold_sensitivity` |
 | Road network scale | 811 nodes, 873 edges | `config.road_network_nodes`, `.road_network_edges` |
-| Gain from confinement, N=1000, road-constrained | +32.3% | derived from `road_mobility.1000` |
-| Gain from adaptation, N=1000, road-constrained | -21.1% | derived from `road_mobility.1000` |
-| Paired significance, adaptation gain, N=1000, road-constrained | +2.54 ± 0.40 pts (significant at 95%) | `road_ablation_significance.1000.adaptation` |
+| Gain from confinement, N=1000, road-constrained | +33.5% | derived from `road_mobility.1000` |
+| Gain from adaptation, N=1000, road-constrained | -22.1% | derived from `road_mobility.1000` |
+| Paired significance, adaptation gain, N=1000, road-constrained | +2.56 ± 0.67 pts (significant at 95%) | `road_ablation_significance.1000.adaptation` |
 
 ## Properties enforced by tests
 

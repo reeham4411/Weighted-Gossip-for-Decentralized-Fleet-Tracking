@@ -5,7 +5,7 @@
 
 ### A. Dataset
 
-Vehicle speeds are drawn from real New York City Taxi and Limousine Commission Yellow Taxi trip records [22]. We compute a per-trip average speed from trip distance and the pickup/dropoff timestamps, and discard trips outside a 5–70 mph band as meter or GPS artifacts. This leaves **3,227,179 valid speed samples**, with mean **11.92 mph** and standard deviation **6.47 mph**.
+Vehicle speeds are drawn from real New York City Taxi and Limousine Commission Yellow Taxi trip records [22]. We compute a per-trip average speed from trip distance and the pickup/dropoff timestamps, and discard trips outside a 5–70 mph band as meter or GPS artifacts. This leaves **12,870,597 valid speed samples**, with mean **11.63 mph** and standard deviation **6.25 mph**.
 
 The coefficient of variation of roughly 0.54 is the reason this problem is not trivial: an unaveraged single reading is already about 54% away from its regional mean in expectation, so a protocol that fails to average has a characteristic error signature we can recognize in the results.
 
@@ -61,20 +61,20 @@ Fig. 1 plots the convergence curves and Fig. 2 the final accuracy with intervals
 
 | N | Protocol | Macro MAPE % | Micro MAPE % | Converged | Hop (m) | B/vehicle | Cross-region % |
 |---|---|---|---|---|---|---|---|
-| 100 | Uniform Random Gossip | 31.19 ± 4.31 | 30.64 ± 4.32 | 0/10 | 514.8 | 6300 | 99.0 |
-| 100 | Fixed GWG | 22.74 ± 2.22 | 22.24 ± 2.11 | 0/10 | 94.7 | 6278 | 75.4 |
-| 100 | Fixed GWG (region-confined) | 20.09 ± 2.28 | 19.18 ± 2.12 | 0/10 | 86.2 | 6278 | 61.1 |
-| 100 | Adaptive-GWG | 19.66 ± 2.28 | 19.00 ± 2.15 | 0/10 | 87.7 | 6330 | 68.7 |
-| 500 | Uniform Random Gossip | 24.33 ± 1.50 | 23.41 ± 1.55 | 0/10 | 521.0 | 6300 | 99.0 |
-| 500 | Fixed GWG | 21.02 ± 1.02 | 19.90 ± 0.92 | 0/10 | 86.5 | 6300 | 70.4 |
-| 500 | Fixed GWG (region-confined) | 9.08 ± 0.56 | 8.72 ± 0.44 | 0/10 | 44.4 | 6300 | 3.7 |
-| 500 | Adaptive-GWG | 9.13 ± 0.55 | 8.70 ± 0.46 | 0/10 | 43.8 | 6316 | 5.3 |
-| 1000 | Uniform Random Gossip | 20.78 ± 0.91 | 20.44 ± 0.88 | 0/10 | 519.9 | 6300 | 99.0 |
-| 1000 | Fixed GWG | 17.87 ± 0.49 | 17.40 ± 0.44 | 0/10 | 84.9 | 6300 | 69.0 |
-| 1000 | Fixed GWG (region-confined) | 9.39 ± 0.18 | 9.49 ± 0.19 | 0/10 | 39.0 | 6300 | 0.0 |
-| 1000 | Adaptive-GWG | 9.40 ± 0.18 | 9.50 ± 0.19 | 0/10 | 39.0 | 6311 | 0.1 |
+| 100 | Uniform Random Gossip | 28.19 ± 3.33 | 27.88 ± 3.30 | 0/10 | 515.5 | 6300 | 99.0 |
+| 100 | Fixed GWG | 21.74 ± 2.09 | 21.33 ± 2.05 | 0/10 | 93.9 | 6270 | 74.5 |
+| 100 | Fixed GWG (region-confined) | 19.59 ± 1.93 | 18.79 ± 1.88 | 0/10 | 85.8 | 6270 | 60.8 |
+| 100 | Adaptive-GWG | 19.60 ± 2.03 | 19.18 ± 2.00 | 0/10 | 87.5 | 6315 | 68.6 |
+| 500 | Uniform Random Gossip | 23.98 ± 0.99 | 22.90 ± 0.88 | 0/10 | 520.9 | 6300 | 99.0 |
+| 500 | Fixed GWG | 20.92 ± 0.93 | 19.89 ± 0.94 | 0/10 | 86.4 | 6300 | 70.3 |
+| 500 | Fixed GWG (region-confined) | 8.91 ± 0.53 | 8.56 ± 0.47 | 0/10 | 44.3 | 6300 | 3.7 |
+| 500 | Adaptive-GWG | 9.20 ± 0.52 | 8.67 ± 0.46 | 0/10 | 43.5 | 6316 | 5.1 |
+| 1000 | Uniform Random Gossip | 20.32 ± 0.50 | 20.04 ± 0.60 | 0/10 | 519.7 | 6300 | 99.0 |
+| 1000 | Fixed GWG | 17.39 ± 0.48 | 16.80 ± 0.50 | 0/10 | 84.8 | 6300 | 68.9 |
+| 1000 | Fixed GWG (region-confined) | 9.03 ± 0.32 | 9.16 ± 0.31 | 0/10 | 38.8 | 6300 | 0.0 |
+| 1000 | Adaptive-GWG | 9.04 ± 0.33 | 9.20 ± 0.31 | 0/10 | 38.8 | 6312 | 0.1 |
 
-At the largest fleet size (N = 1000), Adaptive-GWG reaches **9.40% ± 0.18** macro MAPE against **20.78%** for Uniform Random Gossip — a **55% reduction**. The ordering is consistent across every fleet size and the confidence intervals of Adaptive-GWG and Uniform Random Gossip do not overlap at any N.
+At the largest fleet size (N = 1000), Adaptive-GWG reaches **9.04% ± 0.33** macro MAPE against **20.32%** for Uniform Random Gossip — a **55% reduction**. The ordering is consistent across every fleet size and the confidence intervals of Adaptive-GWG and Uniform Random Gossip do not overlap at any N.
 
 ### B. Where the Improvement Actually Comes From
 
@@ -86,13 +86,13 @@ Fig. 3 shows the same decomposition graphically.
 
 | N | Fixed GWG | + region confinement | + adaptive regions | Gain from confinement | Gain from adaptation |
 |---|---|---|---|---|---|
-| 100 | 22.74% | 20.09% | 19.66% | +11.6% | +2.2% |
-| 500 | 21.02% | 9.08% | 9.13% | +56.8% | -0.5% |
-| 1000 | 17.87% | 9.39% | 9.40% | +47.5% | -0.1% |
+| 100 | 21.74% | 19.59% | 19.60% | +9.9% | -0.1% |
+| 500 | 20.92% | 8.91% | 9.20% | +57.4% | -3.3% |
+| 1000 | 17.39% | 9.03% | 9.04% | +48.1% | -0.2% |
 
-**Region confinement accounts for the entire improvement.** Restricting peer selection to the sender's own cell — a one-line change to the fixed-grid baseline — is worth +11.6% at N=100 (1 vehicles/cell), +56.8% at N=500 (5 vehicles/cell), +47.5% at N=1000 (10 vehicles/cell).
+**Region confinement accounts for the entire improvement.** Restricting peer selection to the sender's own cell — a one-line change to the fixed-grid baseline — is worth +9.9% at N=100 (1 vehicles/cell), +57.4% at N=500 (5 vehicles/cell), +48.1% at N=1000 (10 vehicles/cell).
 
-**Adaptive region management adds nothing measurable on top of it:** +2.2% at N=100, -0.5% at N=500, -0.1% at N=1000. Every one of these is negative or negligible.
+**Adaptive region management adds nothing measurable on top of it:** -0.1% at N=100, -3.3% at N=500, -0.2% at N=1000. Every one of these is negative or negligible.
 
 Fig. 12 plots this test as a forest plot, alongside its road-constrained counterpart from Section VI-J.
 
@@ -100,9 +100,9 @@ Fig. 12 plots this test as a forest plot, alongside its road-constrained counter
 
 | N | Paired mean diff | 95% CI (paired) | Significant at 95%? |
 |---|---|---|---|
-| 100 | -0.43 pts | ± 0.52 pts | no |
-| 500 | +0.05 pts | ± 0.27 pts | no |
-| 1000 | +0.01 pts | ± 0.03 pts | no |
+| 100 | +0.02 pts | ± 0.75 pts | no |
+| 500 | +0.29 pts | ± 0.32 pts | no |
+| 1000 | +0.02 pts | ± 0.03 pts | no |
 
 Because every trial pairs the same fleet across all four protocols (Section V-B), the statistically correct test for 'does adaptation change the error' is on the *paired* per-trial difference, not on whether Adaptive-GWG's and Fixed GWG (region-confined)'s independent confidence intervals happen to overlap. The paired test cancels the trial-to-trial fleet variance both protocols share and is therefore strictly more powerful than an overlap check — it can detect a real difference that an overlap check would miss, which makes it the right tool for a claim of *no* difference. Table III-A applies it: at every fleet size tested, the paired 95% confidence interval on the difference includes zero, so the null hypothesis of no effect from adaptive region management cannot be rejected at the 95% level — a stronger and more specific statement than 'the raw intervals overlap'. Adaptive-GWG additionally carries region-management control traffic that the confined baseline does not (Section VI-D), so even a statistically indistinguishable accuracy difference is a net cost once traffic is priced in.
 
@@ -114,17 +114,17 @@ This does not make region management useless in general, and we are careful not 
 
 ### C. The Error Floor of Unconfined Gossip
 
-Uniform Random Gossip and Fixed GWG do not converge at any fleet size (0/10 trials). This is not slow convergence; it is convergence to the wrong target. Push-sum over a connected graph converges to the average over that graph, and when peer selection may cross region boundaries the graph spans the whole service area, so every vehicle's estimate is drawn toward the city-wide mean. The cross-region exchange rate makes the mechanism explicit: **69.0%** of Fixed GWG's exchanges cross a region boundary at N = 1000, versus **0.1%** for Adaptive-GWG.
+Uniform Random Gossip and Fixed GWG do not converge at any fleet size (0/10 trials). This is not slow convergence; it is convergence to the wrong target. Push-sum over a connected graph converges to the average over that graph, and when peer selection may cross region boundaries the graph spans the whole service area, so every vehicle's estimate is drawn toward the city-wide mean. The cross-region exchange rate makes the mechanism explicit: **68.9%** of Fixed GWG's exchanges cross a region boundary at N = 1000, versus **0.1%** for Adaptive-GWG.
 
-Note that Fixed GWG's error (17.87%) is barely below Uniform's (20.78%) despite cutting mean hop distance from 520 m to 85 m — a 84% reduction. **Geographic weighting buys locality of communication, not locality of estimation.** This distinction is easy to lose, because a protocol that talks only to nearby vehicles feels like it should produce a local answer. It does not: the exchange graph remains connected across the whole area, and mass flows along it regardless of how short each individual hop is.
+Note that Fixed GWG's error (17.39%) is barely below Uniform's (20.32%) despite cutting mean hop distance from 520 m to 85 m — a 84% reduction. **Geographic weighting buys locality of communication, not locality of estimation.** This distinction is easy to lose, because a protocol that talks only to nearby vehicles feels like it should produce a local answer. It does not: the exchange graph remains connected across the whole area, and mass flows along it regardless of how short each individual hop is.
 
-The confined variants collapse this rate to near zero once cells are populated (0.0% at N = 1000), and their accuracy improves correspondingly. At N = 100 they cannot: **61.1%** of the confined baseline's exchanges still cross a boundary, because with about 1 vehicle per cell the fallback rule fires almost every round. That is the mechanism behind the negative confinement gain in Table III, measured rather than inferred.
+The confined variants collapse this rate to near zero once cells are populated (0.0% at N = 1000), and their accuracy improves correspondingly. At N = 100 they cannot: **60.8%** of the confined baseline's exchanges still cross a boundary, because with about 1 vehicle per cell the fallback rule fires almost every round. That is the mechanism behind the negative confinement gain in Table III, measured rather than inferred.
 
-One caveat on how to read this column for Adaptive-GWG. It is measured against the reporting partition for every protocol, so for the confined baselines it is pure leakage — their regions *are* the reporting cells. Adaptive-GWG's regions are deliberately not the reporting cells, so its rate (68.7% at N = 100, 0.1% at N = 1000) mixes leakage with intentional pooling across cells it has merged. It is therefore diagnostic for the baselines and only indicative for our protocol, and we do not read Adaptive-GWG's higher rate at N = 100 as a defect — it is the merge rule doing what it was designed to do.
+One caveat on how to read this column for Adaptive-GWG. It is measured against the reporting partition for every protocol, so for the confined baselines it is pure leakage — their regions *are* the reporting cells. Adaptive-GWG's regions are deliberately not the reporting cells, so its rate (68.6% at N = 100, 0.1% at N = 1000) mixes leakage with intentional pooling across cells it has merged. It is therefore diagnostic for the baselines and only indicative for our protocol, and we do not read Adaptive-GWG's higher rate at N = 100 as a defect — it is the merge rule doing what it was designed to do.
 
 ### D. Cost of Adaptation
 
-Adaptive-GWG is not free. At N = 1000 it sends **6311 B per vehicle** against **6300 B** for the confined fixed-grid baseline, an overhead of **0.2%**, from region-change announcements. Data-plane message counts are identical across protocols by construction — one exchange per vehicle per round — so the control traffic is the entire difference, and reporting it as free (as our earlier harness did) would have made the accuracy comparison meaningless.
+Adaptive-GWG is not free. At N = 1000 it sends **6312 B per vehicle** against **6300 B** for the confined fixed-grid baseline, an overhead of **0.2%**, from region-change announcements. Data-plane message counts are identical across protocols by construction — one exchange per vehicle per round — so the control traffic is the entire difference, and reporting it as free (as our earlier harness did) would have made the accuracy comparison meaningless.
 
 Fig. 4 reports mean hop distance and Fig. 5 the communication cost including control traffic.
 
@@ -132,20 +132,20 @@ Fig. 4 reports mean hop distance and Fig. 5 the communication cost including con
 
 | τ (rounds) | Macro MAPE % | Control messages | B/vehicle |
 |---|---|---|---|
-| 1 | 9.21 ± 0.35 | 666 | 6316 |
-| 2 | 9.47 ± 0.36 | 658 | 6316 |
-| 5 | 9.99 ± 0.40 | 629 | 6315 |
-| 10 | 10.41 ± 0.38 | 591 | 6314 |
-| 25 | 13.25 ± 0.51 | 523 | 6313 |
+| 1 | 9.10 ± 1.19 | 629 | 6315 |
+| 2 | 9.34 ± 1.23 | 620 | 6315 |
+| 5 | 9.76 ± 1.27 | 597 | 6314 |
+| 10 | 10.21 ± 1.27 | 564 | 6314 |
+| 25 | 13.24 ± 2.02 | 505 | 6312 |
 
-Refreshing every round costs 666 control messages and yields 9.21% macro MAPE; refreshing every 25 rounds cuts control traffic by 21% at 13.25% macro MAPE. The trade-off is real but shallow in bytes: control traffic is a small fraction of a budget dominated by the per-round push-sum payload.
+Refreshing every round costs 629 control messages and yields 9.10% macro MAPE; refreshing every 25 rounds cuts control traffic by 20% at 13.24% macro MAPE. The trade-off is real but shallow in bytes: control traffic is a small fraction of a budget dominated by the per-round push-sum payload.
 
 ### E. Periodic Restart and the Drift Caused by Mobility
 
 Running push-sum on a moving fleet has a failure mode that a single end-of-run number hides. Without periodic restart the estimate reaches a minimum after a handful of rounds and then **degrades steadily**, because re-initialization at region boundaries keeps injecting fresh weight-1 mass into regions where push-sum has already concentrated mass on a few holders. The region's weight fills up with unaveraged single readings and the estimate drifts back toward exactly the raw measurement the protocol exists to improve on.
 
-- Fixed GWG (region-confined) without restart: best **7.00%** at round 7, degrading to **22.47%** steady state — a factor of 3.2.
-- Adaptive-GWG without restart: best **6.90%** at round 8, degrading to **17.52%** steady state — a factor of 2.5.
+- Fixed GWG (region-confined) without restart: best **5.86%** at round 9, degrading to **22.80%** steady state — a factor of 3.9.
+- Adaptive-GWG without restart: best **6.09%** at round 9, degrading to **18.16%** steady state — a factor of 3.0.
 
 The remedy is standard for push-sum over time-varying data: restart the accumulator periodically. The convergence curve sets the period — long enough to average, short enough that drift cannot accumulate. We apply it identically to every protocol, so it favours none of them.
 
@@ -155,15 +155,15 @@ Fig. 10 plots the sweep.
 
 | Restart interval | Uniform Random Gossip | Fixed GWG | Fixed GWG (region-confined) | Adaptive-GWG |
 |---|---|---|---|---|
-| every 5 rounds | 24.86 | 22.00 | 12.33 | 12.40 |
-| every 10 rounds | 23.87 | 21.12 | 9.20 | 9.21 |
-| every 20 rounds | 23.67 | 21.59 | 8.92 | 8.65 |
-| every 50 rounds | 24.49 | 23.53 | 12.00 | 10.48 |
-| never | 29.73 | 29.89 | 22.47 | 17.52 |
+| every 5 rounds | 24.98 | 22.16 | 11.90 | 12.25 |
+| every 10 rounds | 24.08 | 21.30 | 8.68 | 9.10 |
+| every 20 rounds | 23.99 | 21.66 | 8.43 | 8.56 |
+| every 50 rounds | 24.82 | 23.63 | 11.95 | 10.83 |
+| never | 30.63 | 30.35 | 22.80 | 18.16 |
 
-Restarting every 20 rounds is best for both confined protocols, cutting Adaptive-GWG from 17.52% to 8.65%. Restarting too often leaves too few rounds to average; too rarely lets drift accumulate. The remaining experiments use every 10 rounds, which is within the confidence interval of the 20-round optimum (9.21% vs 8.65%) and was fixed before this sweep was run.
+Restarting every 20 rounds is best for both confined protocols, cutting Adaptive-GWG from 18.16% to 8.56%. Restarting too often leaves too few rounds to average; too rarely lets drift accumulate. The remaining experiments use every 10 rounds, which is within the confidence interval of the 20-round optimum (9.10% vs 8.56%) and was fixed before this sweep was run.
 
-The most informative column is the leftmost. Uniform Random Gossip and Fixed GWG barely move across the entire sweep (29.7% → 23.7% and 29.9% → 21.6%). Restart repairs staleness, and staleness was never their problem — they are converging accurately to the wrong quantity, and no scheduling change fixes a target error. This is the cleanest confirmation in the paper that the error floor of Section VI-C is structural rather than an artifact of how long we ran the protocol.
+The most informative column is the leftmost. Uniform Random Gossip and Fixed GWG barely move across the entire sweep (30.6% → 24.0% and 30.4% → 21.7%). Restart repairs staleness, and staleness was never their problem — they are converging accurately to the wrong quantity, and no scheduling change fixes a target error. This is the cleanest confirmation in the paper that the error floor of Section VI-C is structural rather than an artifact of how long we ran the protocol.
 
 ### F. Mobility
 
@@ -173,16 +173,16 @@ Fig. 9 shows the same comparison.
 
 | Protocol | Static macro MAPE % | Mobile macro MAPE % | Degradation |
 |---|---|---|---|
-| Uniform Random Gossip | 23.48 | 23.87 | +2% |
-| Fixed GWG | 20.72 | 21.12 | +2% |
-| Fixed GWG (region-confined) | 7.75 | 9.20 | +19% |
-| Adaptive-GWG | 8.38 | 9.21 | +10% |
+| Uniform Random Gossip | 23.26 | 24.08 | +4% |
+| Fixed GWG | 20.45 | 21.30 | +4% |
+| Fixed GWG (region-confined) | 7.03 | 8.68 | +24% |
+| Adaptive-GWG | 7.55 | 9.10 | +20% |
 
-With periodic restart in place, mobility costs between 2% and 19% additional error. That is a far smaller penalty than the same comparison shows without restart, which is the point of Section VI-E: most of what looks like a mobility penalty is really accumulated drift that restart already removes.
+With periodic restart in place, mobility costs between 4% and 24% additional error. That is a far smaller penalty than the same comparison shows without restart, which is the point of Section VI-E: most of what looks like a mobility penalty is really accumulated drift that restart already removes.
 
-The two confined protocols absorb the larger relative hit (7.75% → 9.20% and 8.38% → 9.21%) precisely because they have the most to lose: they are the only ones estimating the right quantity in the first place, so discarding accumulated averaging at a boundary crossing actually costs them something. The unconfined baselines barely move, for the same unflattering reason they are insensitive to everything else in this paper.
+The two confined protocols absorb the larger relative hit (7.03% → 8.68% and 7.55% → 9.10%) precisely because they have the most to lose: they are the only ones estimating the right quantity in the first place, so discarding accumulated averaging at a boundary crossing actually costs them something. The unconfined baselines barely move, for the same unflattering reason they are insensitive to everything else in this paper.
 
-We note that Adaptive-GWG is **behind** the confined baseline in both conditions here (8.38% vs 7.75% static, 9.21% vs 9.20% mobile), consistent with Section VI-B: adaptive region boundaries move as density fluctuates, and each move forces a re-initialization that a fixed grid does not pay. Under mobility, a stable partition is worth more than a well-fitted one.
+We note that Adaptive-GWG is **behind** the confined baseline in both conditions here (7.55% vs 7.03% static, 9.10% vs 8.68% mobile), consistent with Section VI-B: adaptive region boundaries move as density fluctuates, and each move forces a re-initialization that a fixed grid does not pay. Under mobility, a stable partition is worth more than a well-fitted one.
 
 ### G. Churn
 
@@ -192,15 +192,15 @@ Fig. 6 plots error against churn rate.
 
 | Churn ρ | Uniform Random Gossip | Fixed GWG | Fixed GWG (region-confined) | Adaptive-GWG |
 |---|---|---|---|---|
-| 0.00 | 23.87% | 21.12% | 9.20% | 9.21% |
-| 0.01 | 24.72% | 21.66% | 10.67% | 10.57% |
-| 0.02 | 25.21% | 22.48% | 11.65% | 11.75% |
-| 0.05 | 24.91% | 22.31% | 14.02% | 13.75% |
-| 0.10 | 25.20% | 22.38% | 15.67% | 15.44% |
+| 0.00 | 24.08% | 21.30% | 8.68% | 9.10% |
+| 0.01 | 24.54% | 21.16% | 10.34% | 10.25% |
+| 0.02 | 24.14% | 20.69% | 10.96% | 10.76% |
+| 0.05 | 24.36% | 21.31% | 13.28% | 13.01% |
+| 0.10 | 25.39% | 22.02% | 15.47% | 15.29% |
 
-Churn degrades Adaptive-GWG from 9.21% to 15.44% as the per-round departure probability rises from 0% to 10%, because a departing vehicle destroys the push-sum mass it holds and push-sum conserves mass only over a fixed population.
+Churn degrades Adaptive-GWG from 9.10% to 15.29% as the per-round departure probability rises from 0% to 10%, because a departing vehicle destroys the push-sum mass it holds and push-sum conserves mass only over a fixed population.
 
-The ordering between protocols is preserved at every churn rate tested, with Adaptive-GWG best throughout (9.21%–15.44%) and Uniform Random Gossip worst (23.87%–23.87%), so no conclusion in Section VI-B depends on the churn setting.
+The ordering between protocols is preserved at every churn rate tested, with Adaptive-GWG best throughout (9.10%–15.29%) and Uniform Random Gossip worst (24.08%–24.08%), so no conclusion in Section VI-B depends on the churn setting.
 
 ### H. Sensitivity to the Adaptive Thresholds
 
@@ -210,22 +210,22 @@ Fig. 7 plots the sweep.
 
 | n_min | n_max | Macro MAPE % | Mean active regions |
 |---|---|---|---|
-| 2 | 12 | 9.20 ± 0.46 | 97.4 |
-| 2 | 20 | 9.17 ± 0.47 | 96.5 |
-| 2 | 30 | 9.17 ± 0.47 | 96.5 |
-| 3 | 12 | 9.21 ± 0.35 | 88.5 |
-| 3 | 20 | 9.21 ± 0.35 | 87.9 |
-| 3 | 30 | 9.21 ± 0.35 | 87.9 |
-| 5 | 12 | 15.32 ± 0.93 | 55.4 |
-| 5 | 20 | 15.30 ± 0.95 | 55.4 |
-| 5 | 30 | 15.30 ± 0.95 | 55.4 |
-| 8 | 12 | 20.14 ± 1.02 | 13.2 |
-| 8 | 20 | 20.10 ± 1.03 | 13.5 |
-| 8 | 30 | 20.10 ± 1.03 | 13.5 |
+| 2 | 12 | 8.74 ± 1.20 | 98.0 |
+| 2 | 20 | 8.71 ± 1.22 | 97.0 |
+| 2 | 30 | 8.71 ± 1.22 | 97.0 |
+| 3 | 12 | 9.13 ± 1.18 | 89.5 |
+| 3 | 20 | 9.10 ± 1.19 | 88.7 |
+| 3 | 30 | 9.10 ± 1.19 | 88.7 |
+| 5 | 12 | 15.89 ± 1.87 | 54.4 |
+| 5 | 20 | 15.85 ± 1.89 | 54.6 |
+| 5 | 30 | 15.85 ± 1.89 | 54.6 |
+| 8 | 12 | 20.24 ± 2.22 | 12.8 |
+| 8 | 20 | 20.17 ± 2.23 | 13.2 |
+| 8 | 30 | 20.17 ± 2.23 | 13.2 |
 
-Accuracy is governed almost entirely by the merge threshold n_min; the split threshold n_max has almost no effect at this density, because few cells hold enough vehicles to trigger a split at all. The best setting tested (n_min = 2, n_max = 20) gives 9.17 ± 0.47% with 97 active regions; the worst (n_min = 8, n_max = 12) gives 20.14 ± 1.02% with 13.
+Accuracy is governed almost entirely by the merge threshold n_min; the split threshold n_max has almost no effect at this density, because few cells hold enough vehicles to trigger a split at all. The best setting tested (n_min = 2, n_max = 20) gives 8.71 ± 1.22% with 97 active regions; the worst (n_min = 8, n_max = 12) gives 20.24 ± 2.22% with 13.
 
-Reading down the merge threshold: n_min=2 → 9.18% (97 regions), n_min=3 → 9.21% (88 regions), n_min=5 → 15.31% (55 regions), n_min=8 → 20.12% (13 regions).
+Reading down the merge threshold: n_min=2 → 8.72% (97 regions), n_min=3 → 9.11% (89 regions), n_min=5 → 15.87% (55 regions), n_min=8 → 20.20% (13 regions).
 
 This bears directly on an obvious confound: that Adaptive-GWG might win merely by producing coarser, internally more homogeneous regions. The sweep argues against it — the most aggressive merging (13 regions) is the worst configuration, while the best keeps the partition close to the underlying grid (97 regions) and repairs only those cells too sparse to gossip within.
 
@@ -239,24 +239,24 @@ Fig. 8 plots error against the decision deadline.
 
 | N | Protocol | 0.5 s | 1.0 s | 2.0 s | 5.0 s |
 |---|---|---|---|---|---|
-| 100 | Uniform Random Gossip | 31.5 | 33.3 | 33.4 | 34.0 |
-| 100 | Fixed GWG | 23.9 | 27.3 | 27.2 | 27.0 |
-| 100 | Fixed GWG (region-confined) | 21.2 | 24.8 | 23.5 | 24.0 |
-| 100 | Adaptive-GWG | 21.6 | 23.0 | 21.6 | 23.2 |
-| 500 | Uniform Random Gossip | 23.6 | 24.3 | 24.3 | 23.4 |
-| 500 | Fixed GWG | 20.3 | 21.1 | 21.1 | 21.1 |
-| 500 | Fixed GWG (region-confined) | 7.2 ✓ | 7.1 ✓ | 6.2 ✓ | 6.9 ✓ |
-| 500 | Adaptive-GWG | 7.3 ✓ | 6.5 ✓ | 6.2 ✓ | 6.7 ✓ |
-| 1000 | Uniform Random Gossip | 19.5 | 19.0 | 19.0 | 18.5 |
-| 1000 | Fixed GWG | 15.9 | 15.9 | 15.9 | 15.9 |
-| 1000 | Fixed GWG (region-confined) | 6.7 ✓ | 4.0 ✓ | 4.2 ✓ | 4.0 ✓ |
-| 1000 | Adaptive-GWG | 6.7 ✓ | 4.0 ✓ | 4.3 ✓ | 4.1 ✓ |
+| 100 | Uniform Random Gossip | 27.0 | 27.2 | 28.3 | 28.9 |
+| 100 | Fixed GWG | 20.3 | 22.7 | 23.4 | 23.4 |
+| 100 | Fixed GWG (region-confined) | 18.7 | 22.6 | 22.7 | 21.5 |
+| 100 | Adaptive-GWG | 18.2 | 20.3 | 20.7 | 20.3 |
+| 500 | Uniform Random Gossip | 22.5 | 22.7 | 22.6 | 22.6 |
+| 500 | Fixed GWG | 19.4 | 20.2 | 20.6 | 20.7 |
+| 500 | Fixed GWG (region-confined) | 6.6 ✓ | 5.9 ✓ | 6.4 ✓ | 6.4 ✓ |
+| 500 | Adaptive-GWG | 6.7 ✓ | 5.8 ✓ | 6.6 ✓ | 6.5 ✓ |
+| 1000 | Uniform Random Gossip | 19.0 | 18.1 | 18.5 | 18.9 |
+| 1000 | Fixed GWG | 15.4 | 15.1 | 14.9 | 15.9 |
+| 1000 | Fixed GWG (region-confined) | 6.3 ✓ | 3.8 ✓ | 4.0 ✓ | 4.7 ✓ |
+| 1000 | Adaptive-GWG | 6.3 ✓ | 3.8 ✓ | 4.1 ✓ | 4.6 ✓ |
 
 Two observations. Under mobility, error does not decrease monotonically with the deadline: the estimate improves over the first few rounds and then degrades as boundary crossings accumulate and re-initialization discards averaging work. A longer deadline is therefore not automatically a better estimate, which is counter-intuitive and worth stating plainly for anyone sizing a real deployment. Second, the unconfined baselines never reach the usable threshold at any deadline or fleet size — consistent with Section VI-C, they are converging to the wrong quantity, and no amount of additional time repairs that.
 
 ### J. Robustness to Road-Constrained Mobility
 
-Every result above uses a reflected random walk: a plausible but synthetic mobility model, and the one caveat reviewers of this line of work raise most often. To check whether the confinement finding is an artefact of that choice, we rerun the same four-protocol comparison with vehicles confined to a real NYC street network (811 intersections, 873 street segments, fetched via OpenStreetMap for a block the same size as the service area) instead of moving freely: a vehicle drives along its current street and turns only at an intersection. Region assignment, radio range, and the congestion field are unchanged — only how vehicles move through the same square changes.
+Every result above uses a reflected random walk: a plausible but synthetic mobility model, and the one caveat reviewers of this line of work raise most often. To check whether the confinement finding is an artefact of that choice, we rerun the same four-protocol comparison with vehicles confined to a real NYC street network (811 intersections, 873 street segments, fetched via OpenStreetMap [25] for a block the same size as the service area) instead of moving freely: a vehicle drives along its current street and turns only at an intersection. Region assignment, radio range, and the congestion field are unchanged — only how vehicles move through the same square changes.
 
 Fig. 11 plots both mobility models side by side.
 
@@ -264,14 +264,14 @@ Fig. 11 plots both mobility models side by side.
 
 | N | Mobility model | Uniform Random Gossip | Fixed GWG | Fixed GWG (region-confined) | Adaptive-GWG |
 |---|---|---|---|---|---|
-| 1000 | Random walk | 20.78 ± 0.91 | 17.87 ± 0.49 | 9.39 ± 0.18 | 9.40 ± 0.18 |
-| 1000 | Road-constrained | 18.55 ± 0.75 | 17.77 ± 0.81 | 12.03 ± 0.87 | 14.57 ± 0.78 |
+| 1000 | Random walk | 20.32 ± 0.50 | 17.39 ± 0.48 | 9.03 ± 0.32 | 9.04 ± 0.33 |
+| 1000 | Road-constrained | 18.71 ± 1.36 | 17.42 ± 0.93 | 11.58 ± 0.66 | 14.13 ± 0.81 |
 
-At N = 1000, region confinement reduces macro MAPE by 47.5% under the random walk and by 32.3% under road-constrained mobility; adaptive region management adds -0.1% and -21.1% respectively on top of confinement.
+At N = 1000, region confinement reduces macro MAPE by 48.1% under the random walk and by 33.5% under road-constrained mobility; adaptive region management adds -0.2% and -22.1% respectively on top of confinement.
 
-This check runs only 5 trials, so the road-constrained numbers need their own uncertainty rather than borrowing the confidence the headline result earns from 10. Paired across those 5 trials (same fleet, same seed, per `paired_diff_ci95`): confinement still reduces macro MAPE by 5.74 ± 0.18 points (significant at 95%), and adaptive region management on top of confinement changes macro MAPE by +2.54 ± 0.40 points (significant at 95%).
+This check runs only 5 trials, so the road-constrained numbers need their own uncertainty rather than borrowing the confidence the headline result earns from 10. Paired across those 5 trials (same fleet, same seed, per `paired_diff_ci95`): confinement still reduces macro MAPE by 5.84 ± 1.04 points (significant at 95%), and adaptive region management on top of confinement changes macro MAPE by +2.56 ± 0.67 points (significant at 95%).
 
-Confinement's advantage survives the switch to real street topology essentially intact (47.5% → 32.3%). Adaptive region management does not: under the random walk the paired test above finds no significant effect, but under road-constrained movement it costs 21.1% relative to the confined baseline, and that difference *is* significant at the 95% level even at this trial count — a real degradation, not noise. This strengthens rather than undercuts Section VI-B's conclusion: the case for skipping adaptive region management does not weaken under a more realistic mobility model, it gets stronger, plausibly because a street grid changes cell-boundary-crossing frequency (and so how often the re-initialization cost of Section VI-F is paid) in a way the adaptive layer's region churn responds to badly.
+Confinement's advantage survives the switch to real street topology essentially intact (48.1% → 33.5%). Adaptive region management does not: under the random walk the paired test above finds no significant effect, but under road-constrained movement it costs 22.1% relative to the confined baseline, and that difference *is* significant at the 95% level even at this trial count — a real degradation, not noise. This strengthens rather than undercuts Section VI-B's conclusion: the case for skipping adaptive region management does not weaken under a more realistic mobility model, it gets stronger, plausibly because a street grid changes cell-boundary-crossing frequency (and so how often the re-initialization cost of Section VI-F is paid) in a way the adaptive layer's region churn responds to badly.
 
 This check uses 5 trials rather than the headline 10, and one real street layout rather than a sweep of them (Section VII); it establishes that the finding is not an artefact of one particular synthetic mobility model, not that it holds for every real one.
 

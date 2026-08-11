@@ -557,7 +557,7 @@ def main():
       f"often. To check whether the confinement finding is an artefact of that choice, "
       f"we rerun the same four-protocol comparison with vehicles confined to a real "
       f"NYC street network ({cfg['road_network_nodes']} intersections, "
-      f"{cfg['road_network_edges']} street segments, fetched via OpenStreetMap for a "
+      f"{cfg['road_network_edges']} street segments, fetched via OpenStreetMap [25] for a "
       f"block the same size as the service area) instead of moving freely: a vehicle "
       f"drives along its current street and turns only at an intersection. Region "
       f"assignment, radio range, and the congestion field are unchanged — only how "
